@@ -22,8 +22,15 @@ GENRES = ["💥 Jangari", "😂 Komediya", "❤️ Melodrama", "🦁 Multfilm", 
 admin_states = {}
 pending_channel_videos = {}
 
+def escape_md(text):
+    if not text:
+        return ""
+    for char in ['_', '*', '`', '[']:
+        text = text.replace(char, '')
+    return text
 
 def is_super_admin(user_id):
+
     return user_id in config.ADMIN_IDS
 
 def is_admin(user_id):
@@ -116,22 +123,34 @@ def get_unsubscribed_channels(user_id):
     return unsubscribed
 
 def check_must_join(message):
-    unsubscribed = get_unsubscribed_channels(message.from_user.id)
-    if unsubscribed:
-        markup = types.InlineKeyboardMarkup(row_width=1)
-        for title, invite_link in unsubscribed:
-            markup.add(types.InlineKeyboardButton(text=f"📢 {title}", url=invite_link))
-        
-        markup.add(types.InlineKeyboardButton(text="🔄 Tasdiqlash", callback_data="check_sub"))
-        
-        bot.send_message(
-            message.chat.id,
-            "⚠️ **Botdan foydalanish uchun quyidagi homiy kanallariga a'zo bo'lishingiz zarur:**\n\n*(Eslatma: 👑 Premium a'zolar majburiy a'zolikdan ozod qilinadi)*\n\nA'zo bo'lgach, *Tasdiqlash* tugmasini bosing.",
-            reply_markup=markup,
-            parse_mode="Markdown"
-        )
-        return False
-    return True
+    try:
+        unsubscribed = get_unsubscribed_channels(message.from_user.id)
+        if unsubscribed:
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            for title, invite_link in unsubscribed:
+                markup.add(types.InlineKeyboardButton(text=f"📢 {title}", url=invite_link))
+            
+            markup.add(types.InlineKeyboardButton(text="🔄 Tasdiqlash", callback_data="check_sub"))
+            
+            try:
+                bot.send_message(
+                    message.chat.id,
+                    "⚠️ **Botdan foydalanish uchun quyidagi homiy kanallariga a'zo bo'lishingiz zarur:**\n\n*(Eslatma: 👑 Premium a'zolar majburiy a'zolikdan ozod qilinadi)*\n\nA'zo bo'lgach, *Tasdiqlash* tugmasini bosing.",
+                    reply_markup=markup,
+                    parse_mode="Markdown"
+                )
+            except Exception:
+                bot.send_message(
+                    message.chat.id,
+                    "⚠️ Botdan foydalanish uchun quyidagi homiy kanallariga a'zo bo'lishingiz zarur:\n\nA'zo bo'lgach, Tasdiqlash tugmasini bosing.",
+                    reply_markup=markup
+                )
+            return False
+        return True
+    except Exception as e:
+        print(f"Error in check_must_join: {e}")
+        return True
+
 
 # Helper to send formatted movie card
 def send_movie_card(chat_id, code, user_id):
@@ -210,65 +229,77 @@ def send_movie_card(chat_id, code, user_id):
 # /start command
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
-    user_id = message.from_user.id
-    username = message.from_user.username
-    
-    args = message.text.split()
-    referred_by = None
-    direct_movie_code = None
+    try:
+        user_id = message.from_user.id
+        username = message.from_user.username
+        first_name = escape_md(message.from_user.first_name or "Foydalanuvchi")
+        
+        args = message.text.split()
+        referred_by = None
+        direct_movie_code = None
 
-    if len(args) > 1:
-        param = args[1].strip()
-        if param.startswith("ref_"):
-            try:
-                referred_by = int(param.replace("ref_", ""))
-            except ValueError:
-                pass
-        elif param.isdigit():
-            direct_movie_code = param
-
-    database.add_user(user_id, username, referred_by)
-
-    # Referral reward logic: 10 referrals = 30 days FREE Premium!
-    if referred_by and referred_by != user_id:
-        added = database.add_referral(referred_by, user_id)
-        if added:
-            ref_count = database.get_user_referral_count(referred_by)
-            try:
-                bot.send_message(referred_by, f"🎉 Sizning havolangiz orqali yangi foydalanuvchi botga kirdi!\nJami taklif qilgan do'stlaringiz: **{ref_count}** ta", parse_mode="Markdown")
-            except Exception:
-                pass
-
-            if ref_count > 0 and ref_count % 10 == 0:
-                database.add_premium(referred_by, days=30)
+        if len(args) > 1:
+            param = args[1].strip()
+            if param.startswith("ref_"):
                 try:
-                    bot.send_message(
-                        referred_by,
-                        "🎉 **TABRIKLAYMIZ!** Siz 10 ta do'stingizni taklif qilganingiz uchun sizga **1 oylik TEKIN 👑 Premium A'zolik** berildi!\n\n"
-                        "Endi siz majburiy a'zolik kanallarisiz hamda VIP kinolarni cheklovlarsiz ko'ra olasiz!",
-                        parse_mode="Markdown"
-                    )
+                    referred_by = int(param.replace("ref_", ""))
+                except ValueError:
+                    pass
+            elif param.isdigit():
+                direct_movie_code = param
+
+        database.add_user(user_id, username, referred_by)
+
+        # Referral reward logic: 10 referrals = 30 days FREE Premium!
+        if referred_by and referred_by != user_id:
+            added = database.add_referral(referred_by, user_id)
+            if added:
+                ref_count = database.get_user_referral_count(referred_by)
+                try:
+                    bot.send_message(referred_by, f"🎉 Sizning havolangiz orqali yangi foydalanuvchi botga kirdi!\nJami taklif qilgan do'stlaringiz: **{ref_count}** ta", parse_mode="Markdown")
                 except Exception:
                     pass
 
-    if not is_admin(user_id):
-        if not check_must_join(message):
+                if ref_count > 0 and ref_count % 10 == 0:
+                    database.add_premium(referred_by, days=30)
+                    try:
+                        bot.send_message(
+                            referred_by,
+                            "🎉 **TABRIKLAYMIZ!** Siz 10 ta do'stingizni taklif qilganingiz uchun sizga **1 oylik TEKIN 👑 Premium A'zolik** berildi!\n\n"
+                            "Endi siz majburiy a'zolik kanallarisiz hamda VIP kinolarni cheklovlarsiz ko'ra olasiz!",
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+
+        if not is_admin(user_id):
+            if not check_must_join(message):
+                return
+
+        # Direct movie code link logic
+        if direct_movie_code:
+            send_movie_card(message.chat.id, direct_movie_code, user_id)
             return
 
-    # Direct movie code link logic
-    if direct_movie_code:
-        send_movie_card(message.chat.id, direct_movie_code, user_id)
-        return
+        prem_info = database.get_premium_info(user_id)
+        badge = " 👑 [PREMIUM]" if prem_info else ""
 
-    prem_info = database.get_premium_info(user_id)
-    badge = " 👑 [PREMIUM]" if prem_info else ""
+        welcome_text = (
+            f"Assalomu alaykum, {first_name}{badge}!\n\n"
+            "🎬 **Kinolarni kod yoki nomi orqali ko'rish botiga xush kelibsiz!**\n"
+            "Kino ko'rish uchun uning kodini yoki nomini yuboring (Masalan: `1230` yoki `Avatar`)."
+        )
+        try:
+            bot.send_message(message.chat.id, welcome_text, reply_markup=get_main_keyboard(user_id), parse_mode="Markdown")
+        except Exception:
+            bot.send_message(message.chat.id, f"Assalomu alaykum, {first_name}!\n\n🎬 Kinolarni kod yoki nomi orqali ko'rish botiga xush kelibsiz!\nKino ko'rish uchun uning kodini yuboring (Masalan: 1230).", reply_markup=get_main_keyboard(user_id))
+    except Exception as e:
+        print(f"Error in start_cmd: {e}")
+        try:
+            bot.send_message(message.chat.id, "Assalomu alaykum! Botga xush kelibsiz.", reply_markup=get_main_keyboard(message.from_user.id))
+        except Exception:
+            pass
 
-    welcome_text = (
-        f"Assalomu alaykum, {message.from_user.first_name}{badge}!\n\n"
-        "🎬 **Kinolarni kod yoki nomi orqali ko'rish botiga xush kelibsiz!**\n"
-        "Kino ko'rish uchun uning kodini yoki nomini yuboring (Masalan: `1230` yoki `Avatar`)."
-    )
-    bot.send_message(message.chat.id, welcome_text, reply_markup=get_main_keyboard(user_id), parse_mode="Markdown")
 
 # Callback query handler
 @bot.callback_query_handler(func=lambda call: True)
