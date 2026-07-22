@@ -20,10 +20,20 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             code TEXT UNIQUE NOT NULL,
             title TEXT NOT NULL,
-            caption TEXT
+            caption TEXT,
+            genre TEXT DEFAULT 'Umumiy',
+            views INTEGER DEFAULT 0
         )
     """)
     
+    # Migrations for movies table columns if existing
+    cursor.execute("PRAGMA table_info(movies)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'genre' not in columns:
+        cursor.execute("ALTER TABLE movies ADD COLUMN genre TEXT DEFAULT 'Umumiy'")
+    if 'views' not in columns:
+        cursor.execute("ALTER TABLE movies ADD COLUMN views INTEGER DEFAULT 0")
+
     # Create episodes table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS episodes (
@@ -40,9 +50,16 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
             username TEXT,
+            referred_by INTEGER,
             join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    
+    cursor.execute("PRAGMA table_info(users)")
+    user_columns = [col[1] for col in cursor.fetchall()]
+    if 'referred_by' not in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN referred_by INTEGER")
+
     # Create channels table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS channels (
@@ -66,14 +83,38 @@ def init_db():
             value TEXT
         )
     """)
+    # Create ratings table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ratings (
+            user_id INTEGER NOT NULL,
+            movie_code TEXT NOT NULL,
+            rating INTEGER NOT NULL,
+            PRIMARY KEY(user_id, movie_code)
+        )
+    """)
+    # Create favorites table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS favorites (
+            user_id INTEGER NOT NULL,
+            movie_code TEXT NOT NULL,
+            PRIMARY KEY(user_id, movie_code)
+        )
+    """)
+    # Create referrals table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS referrals (
+            referrer_id INTEGER NOT NULL,
+            referred_id INTEGER PRIMARY KEY
+        )
+    """)
     conn.commit()
     conn.close()
 
 
-def add_user(user_id, username):
+def add_user(user_id, username, referred_by=None):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user_id, username))
+    cursor.execute("INSERT OR IGNORE INTO users (user_id, username, referred_by) VALUES (?, ?, ?)", (user_id, username, referred_by))
     conn.commit()
     conn.close()
 
@@ -85,14 +126,14 @@ def get_users_count():
     conn.close()
     return count
 
-def add_movie(code, title, caption):
+def add_movie(code, title, caption, genre='Umumiy'):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            INSERT OR REPLACE INTO movies (code, title, caption)
-            VALUES (?, ?, ?)
-        """, (code.strip(), title.strip(), caption.strip() if caption else ""))
+            INSERT OR REPLACE INTO movies (code, title, caption, genre, views)
+            VALUES (?, ?, ?, ?, COALESCE((SELECT views FROM movies WHERE code = ?), 0))
+        """, (code.strip(), title.strip(), caption.strip() if caption else "", genre.strip(), code.strip()))
         conn.commit()
         success = True
     except Exception as e:
@@ -105,10 +146,42 @@ def add_movie(code, title, caption):
 def get_movie(code):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT code, title, caption FROM movies WHERE code = ?", (code.strip(),))
+    cursor.execute("SELECT code, title, caption, genre, views FROM movies WHERE code = ?", (code.strip(),))
     res = cursor.fetchone()
     conn.close()
     return res
+
+def search_movies_by_name(query):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    search = f"%{query.strip()}%"
+    cursor.execute("SELECT code, title, genre, views FROM movies WHERE title LIKE ? OR caption LIKE ? LIMIT 20", (search, search))
+    res = cursor.fetchall()
+    conn.close()
+    return res
+
+def get_movies_by_genre(genre):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT code, title, views FROM movies WHERE genre = ? ORDER BY id DESC LIMIT 30", (genre.strip(),))
+    res = cursor.fetchall()
+    conn.close()
+    return res
+
+def get_top_movies(limit=10):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT code, title, views, genre FROM movies ORDER BY views DESC LIMIT ?", (limit,))
+    res = cursor.fetchall()
+    conn.close()
+    return res
+
+def increment_movie_views(code):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE movies SET views = views + 1 WHERE code = ?", (code.strip(),))
+    conn.commit()
+    conn.close()
 
 def add_episode(movie_code, episode_title, file_id):
     conn = sqlite3.connect(DB_NAME)
@@ -146,9 +219,10 @@ def get_episode_by_id(episode_id):
 def delete_movie(code):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    # Delete episodes first to mimic cascade
     cursor.execute("DELETE FROM episodes WHERE movie_code = ?", (code.strip(),))
     cursor.execute("DELETE FROM movies WHERE code = ?", (code.strip(),))
+    cursor.execute("DELETE FROM ratings WHERE movie_code = ?", (code.strip(),))
+    cursor.execute("DELETE FROM favorites WHERE movie_code = ?", (code.strip(),))
     conn.commit()
     deleted = cursor.rowcount > 0
     conn.close()
@@ -166,10 +240,97 @@ def delete_episode(episode_id):
 def get_all_movies():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT code, title FROM movies")
+    cursor.execute("SELECT code, title, genre, views FROM movies ORDER BY id DESC")
     res = cursor.fetchall()
     conn.close()
     return res
+
+# ----------------- FAVORITES -----------------
+
+def toggle_favorite(user_id, movie_code):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM favorites WHERE user_id = ? AND movie_code = ?", (user_id, movie_code.strip()))
+    if cursor.fetchone():
+        cursor.execute("DELETE FROM favorites WHERE user_id = ? AND movie_code = ?", (user_id, movie_code.strip()))
+        added = False
+    else:
+        cursor.execute("INSERT INTO favorites (user_id, movie_code) VALUES (?, ?)", (user_id, movie_code.strip()))
+        added = True
+    conn.commit()
+    conn.close()
+    return added
+
+def is_favorite(user_id, movie_code):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM favorites WHERE user_id = ? AND movie_code = ?", (user_id, movie_code.strip()))
+    res = cursor.fetchone()
+    conn.close()
+    return res is not None
+
+def get_favorites(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT m.code, m.title, m.genre 
+        FROM favorites f 
+        JOIN movies m ON f.movie_code = m.code 
+        WHERE f.user_id = ?
+    """, (user_id,))
+    res = cursor.fetchall()
+    conn.close()
+    return res
+
+# ----------------- RATINGS -----------------
+
+def rate_movie(user_id, movie_code, rating):
+    # rating: 1 for Like, -1 for Dislike
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT OR REPLACE INTO ratings (user_id, movie_code, rating)
+        VALUES (?, ?, ?)
+    """, (user_id, movie_code.strip(), rating))
+    conn.commit()
+    conn.close()
+
+def get_movie_ratings(movie_code):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM ratings WHERE movie_code = ? AND rating = 1", (movie_code.strip(),))
+    likes = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM ratings WHERE movie_code = ? AND rating = -1", (movie_code.strip(),))
+    dislikes = cursor.fetchone()[0]
+    conn.close()
+    return likes, dislikes
+
+# ----------------- REFERRALS -----------------
+
+def add_referral(referrer_id, new_user_id):
+    if referrer_id == new_user_id:
+        return False
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO referrals (referrer_id, referred_id) VALUES (?, ?)", (referrer_id, new_user_id))
+        conn.commit()
+        success = True
+    except Exception:
+        success = False
+    finally:
+        conn.close()
+    return success
+
+def get_user_referral_count(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM referrals WHERE referrer_id = ?", (user_id,))
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
+
+# ----------------- CHANNELS & SETTINGS -----------------
 
 def add_channel(channel_id, title, invite_link):
     conn = sqlite3.connect(DB_NAME)
@@ -235,7 +396,6 @@ def delete_setting(key):
     conn.commit()
     conn.close()
 
-
 def add_db_admin(user_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -250,5 +410,3 @@ def is_db_admin(user_id):
     res = cursor.fetchone()
     conn.close()
     return res is not None
-
-
