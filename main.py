@@ -340,15 +340,20 @@ def callback_handler(call):
             bot.send_chat_action(call.message.chat.id, 'upload_video')
 
             caption_full = f"🎬 **Kino nomi:** {movie_title}\n📌 **Qism:** {episode_title}\n🔑 **Kodi:** {movie_code}"
+            
+            # Content protection: Blocks forwarding, saving/downloading to phone gallery, and screen recording/screenshots!
+            protect = not is_admin(user_id)
+
             try:
-                bot.send_video(call.message.chat.id, file_id, caption=caption_full, parse_mode="Markdown")
+                bot.send_video(call.message.chat.id, file_id, caption=caption_full, parse_mode="Markdown", protect_content=protect)
             except Exception:
                 try:
-                    bot.send_document(call.message.chat.id, file_id, caption=caption_full, parse_mode="Markdown")
+                    bot.send_document(call.message.chat.id, file_id, caption=caption_full, parse_mode="Markdown", protect_content=protect)
                 except Exception as e:
                     bot.send_message(call.message.chat.id, f"Kino yuborishda xatolik yuz berdi: {e}")
         else:
             bot.answer_callback_query(call.id, "❌ Ushbu qism topilmadi!", show_alert=True)
+
 
     elif call.data.startswith("genre:"):
         genre_name = call.data.split(":")[1]
