@@ -75,6 +75,7 @@ def get_admin_keyboard(user_id):
     btn_list = types.KeyboardButton("📋 Barcha kinolar")
     btn_stats = types.KeyboardButton("📊 Statistika")
     btn_channels = types.KeyboardButton("📢 Homiylar / Kanallar")
+    btn_source_ch = types.KeyboardButton("📡 Manba Kanalini Sozlash")
     btn_adv = types.KeyboardButton("✉️ Reklama yuborish")
     btn_post_gen = types.KeyboardButton("📢 Post Generator")
     btn_auto_post = types.KeyboardButton("📢 1-Click Kanalga Joylash")
@@ -84,9 +85,10 @@ def get_admin_keyboard(user_id):
     
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
-    keyboard.row(btn_channels, btn_adv)
-    keyboard.row(btn_post_gen, btn_auto_post)
-    keyboard.row(btn_vip_mgmt, btn_prem_mgmt)
+    keyboard.row(btn_channels, btn_source_ch)
+    keyboard.row(btn_adv, btn_post_gen)
+    keyboard.row(btn_auto_post, btn_vip_mgmt)
+    keyboard.row(btn_prem_mgmt)
     
     if is_super_admin(user_id):
         btn_promo = types.KeyboardButton("🔑 Admin kodi yaratish")
@@ -94,6 +96,7 @@ def get_admin_keyboard(user_id):
         
     keyboard.row(btn_back)
     return keyboard
+
 
 def get_channels_keyboard():
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -562,7 +565,15 @@ def callback_handler(call):
 
 @bot.channel_post_handler(content_types=['video', 'document'])
 def handle_channel_movie_post(message):
+    configured_source = database.get_setting('source_channel_id')
+    if configured_source:
+        chat_username = f"@{message.chat.username}" if message.chat.username else ""
+        chat_id_str = str(message.chat.id)
+        if configured_source != chat_username and configured_source != chat_id_str:
+            return
+
     file_id = None
+
     if message.video:
         file_id = message.video.file_id
     elif message.document:
@@ -909,7 +920,21 @@ def text_handler(message):
         bot.send_message(message.chat.id, "Kanallarni boshqarish bo'limi:", reply_markup=get_channels_keyboard())
         return
 
+    elif text == "📡 Manba Kanalini Sozlash" and is_admin(user_id):
+        current_source = database.get_setting('source_channel_id', 'Sozlanmagan (Barcha admin kanallaridan qabul qilinadi)')
+        msg_text = (
+            f"📡 **KINOLAR UCHUN MANBA KANALI SOZLAMALARI:**\n\n"
+            f"📌 **Hozirgi Manba Kanali:** `{current_source}`\n\n"
+            f"Yangi manba kanali username yoki ID-sini kiriting (Masalan: `@my_private_movies` yoki `-100123456789`):\n"
+            f"*(Kanaldan avtomatik kinolar olinishi uchun bot shu kanalda Admin bo'lishi shart!)*\n\n"
+            f"Bekor qilish uchun 'bekor' deb yozing."
+        )
+        msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_set_source_channel)
+        return
+
     elif text == "⬅️ Admin panelga qaytish" and is_admin(user_id):
+
         bot.send_message(message.chat.id, "Admin panelga qaytdingiz:", reply_markup=get_admin_keyboard(user_id))
         return
 
@@ -1063,6 +1088,23 @@ def process_toggle_vip_movie(message):
         bot.send_message(message.chat.id, f"✅ `{code}` kodli kino statusi o'zgartirildi: {status_str}", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
     else:
         bot.send_message(message.chat.id, f"❌ `{code}` kodli kino topilmadi.", reply_markup=get_admin_keyboard(user_id))
+
+def process_set_source_channel(message):
+    user_id = message.from_user.id
+    ch_id = message.text.strip() if message.text else ""
+    if not ch_id or ch_id.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    database.set_setting('source_channel_id', ch_id)
+    bot.send_message(
+        message.chat.id,
+        f"✅ **Yangi manba kanali saqlandi!**\n\n📡 Manba Kanali: `{ch_id}`\n\n"
+        "Endi bot faqat ushbu kanaldan kelgan video/hujjatlarni avtomatik kinolar bazasiga saqlaydi yoki nom kiritishingizni so'raydi.",
+        parse_mode="Markdown",
+        reply_markup=get_admin_keyboard(user_id)
+    )
+
 
 def process_pending_video_title(message, video_key):
     user_id = message.from_user.id
