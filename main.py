@@ -19,8 +19,11 @@ bot = telebot.TeleBot(config.BOT_TOKEN)
 # Temporary dictionary to store admin states
 admin_states = {}
 
+def is_super_admin(user_id):
+    return user_id in config.ADMIN_IDS
+
 def is_admin(user_id):
-    if user_id in config.ADMIN_IDS:
+    if is_super_admin(user_id):
         return True
     return database.is_db_admin(user_id)
 
@@ -42,7 +45,7 @@ def get_main_keyboard(user_id):
         keyboard.add(btn_admin)
     return keyboard
 
-def get_admin_keyboard():
+def get_admin_keyboard(user_id):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn_add = types.KeyboardButton("➕ Kino qo'shish")
     btn_del = types.KeyboardButton("❌ Kino o'chirish")
@@ -50,14 +53,19 @@ def get_admin_keyboard():
     btn_stats = types.KeyboardButton("📊 Statistika")
     btn_channels = types.KeyboardButton("📢 Homiylar / Kanallar")
     btn_adv = types.KeyboardButton("✉️ Reklama yuborish")
-    btn_promo = types.KeyboardButton("🔑 Admin kodi yaratish")
     btn_back = types.KeyboardButton("⬅️ Bosh sahifa")
+    
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
     keyboard.row(btn_channels, btn_adv)
-    keyboard.row(btn_promo)
+    
+    if is_super_admin(user_id):
+        btn_promo = types.KeyboardButton("🔑 Admin kodi yaratish")
+        keyboard.row(btn_promo)
+        
     keyboard.row(btn_back)
     return keyboard
+
 
 
 def get_channels_keyboard():
@@ -163,7 +171,8 @@ def callback_handler(call):
         
     elif call.data == "finish_add_eps":
         bot.answer_callback_query(call.id, "Tizim yakunlandi!")
-        bot.send_message(call.message.chat.id, "Kino va barcha seriyalar bazaga kiritildi! 🎥", reply_markup=get_admin_keyboard())
+        bot.send_message(call.message.chat.id, "Kino va barcha seriyalar bazaga kiritildi! 🎥", reply_markup=get_admin_keyboard(call.from_user.id))
+
         
     elif call.data.startswith("play_ep:"):
         ep_id = int(call.data.split(":")[1])
@@ -212,12 +221,12 @@ def callback_handler(call):
             f"✅ Yetkazildi: {success_count} ta foydalanuvchiga\n"
             f"❌ Yuborilmadi (bloklaganlar): {fail_count} ta"
         )
-        bot.send_message(call.message.chat.id, status_text, parse_mode="Markdown", reply_markup=get_admin_keyboard())
+        bot.send_message(call.message.chat.id, status_text, parse_mode="Markdown", reply_markup=get_admin_keyboard(call.from_user.id))
         
     elif call.data == "cancel_adv":
         bot.answer_callback_query(call.id, "Bekor qilindi")
         bot.delete_message(call.message.chat.id, call.message.message_id)
-        bot.send_message(call.message.chat.id, "Reklama yuborish bekor qilindi.", reply_markup=get_admin_keyboard())
+        bot.send_message(call.message.chat.id, "Reklama yuborish bekor qilindi.", reply_markup=get_admin_keyboard(call.from_user.id))
 
 # Text messages handler
 @bot.message_handler(func=lambda msg: True)
@@ -236,7 +245,7 @@ def text_handler(message):
         return
 
     elif text == "⚙️ Admin panel" and is_admin(user_id):
-        bot.send_message(message.chat.id, "Admin panelga xush kelibsiz. Amalni tanlaning:", reply_markup=get_admin_keyboard())
+        bot.send_message(message.chat.id, "Admin panelga xush kelibsiz. Amalni tanlaning:", reply_markup=get_admin_keyboard(user_id))
         return
 
     elif text == "⬅️ Bosh sahifa":
@@ -281,8 +290,9 @@ def text_handler(message):
         return
 
     elif text == "⬅️ Admin panelga qaytish" and is_admin(user_id):
-        bot.send_message(message.chat.id, "Admin panelga qaytdingiz:", reply_markup=get_admin_keyboard())
+        bot.send_message(message.chat.id, "Admin panelga qaytdingiz:", reply_markup=get_admin_keyboard(user_id))
         return
+
 
     elif text == "➕ Kanal qo'shish" and is_admin(user_id):
         msg = bot.send_message(message.chat.id, "Kanalning ID yoki foydalanuvchi nomini kiriting (Masalan: @kanal_nomi yoki -100123456789):\n⚠️ Diqqat: Bot shu kanalda administrator bo'lishi shart!")
@@ -312,14 +322,14 @@ def text_handler(message):
         bot.register_next_step_handler(msg, process_adv_message)
         return
 
-    # Admin promo code setting handler
-    elif text == "🔑 Admin kodi yaratish" and is_admin(user_id):
+    # Admin promo code setting handler (ONLY FOR SUPER ADMINS)
+    elif text == "🔑 Admin kodi yaratish" and is_super_admin(user_id):
         current_promo = database.get_setting('admin_promo_code', 'Mavjud emas')
         msg = bot.send_message(
             message.chat.id,
-            f"🔑 **Hozirgi Admin kodi:** `{current_promo}`\n\n"
-            "Yangi adminlik beruvchi parolni (kodni) kiriting (Masalan: `secret777`):\n"
-            "*(Ushbu kodni kiritgan har qanday foydalanuvchi botga avtomatik admin bo'ladi)*\n\n"
+            f"🔑 **Hozirgi bir martalik Admin kodi:** `{current_promo}`\n\n"
+            "Yangi bir martalik adminlik parolini (kodni) kiriting (Masalan: `secret777`):\n"
+            "*(Ushbu kodni 1 kishi botga yuborsa, u admin bo'ladi va kod o'chib ketadi)*\n\n"
             "Bekor qilish uchun 'bekor' deb yozing.",
             parse_mode="Markdown"
         )
@@ -330,9 +340,11 @@ def text_handler(message):
     active_promo = database.get_setting('admin_promo_code')
     if active_promo and text.strip() == active_promo:
         database.add_db_admin(user_id)
+        # Single-use code: Delete it immediately after redemption!
+        database.delete_setting('admin_promo_code')
         bot.send_message(
             message.chat.id,
-            "🎉 **Tabriklaymiz!** Siz to'g'ri maxsus admin kodini kiritdingiz.\n\n"
+            "🎉 **Tabriklaymiz!** Siz bir martalik maxsus admin kodini kiritdingiz.\n\n"
             "Sizga botda **ADMIN** huquqi berildi! ⚙️",
             parse_mode="Markdown",
             reply_markup=get_main_keyboard(user_id)
@@ -367,19 +379,21 @@ def text_handler(message):
 # ----------------- ADMIN PROMO CODE WORKFLOW -----------------
 
 def process_set_admin_promo_code(message):
+    user_id = message.from_user.id
     code = message.text.strip() if message.text else ""
     if not code or code.lower() == 'bekor':
-        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard())
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
         return
         
     database.set_setting('admin_promo_code', code)
     bot.send_message(
         message.chat.id,
-        f"✅ **Yangi Admin kodi saqlandi!**\n\n🔑 Parol: `{code}`\n\n"
-        "Endi kim ushbu kodni botga yuborsa, u avtomatik tarzda Admin huquqini oladi.",
+        f"✅ **Yangi bir martalik Admin kodi saqlandi!**\n\n🔑 Parol: `{code}`\n\n"
+        "Ushbu kod faqat 1 marotaba ishlatiladi. Kim uni 1-bo'lib botga yuborsa, u admin bo'ladi va kod avtomatik o'chadi.",
         parse_mode="Markdown",
-        reply_markup=get_admin_keyboard()
+        reply_markup=get_admin_keyboard(user_id)
     )
+
 
 
 # ----------------- ADD MOVIE WORKFLOW -----------------

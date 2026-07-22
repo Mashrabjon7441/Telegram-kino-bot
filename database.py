@@ -228,6 +228,14 @@ def get_setting(key, default=None):
     conn.close()
     return res[0] if res else default
 
+def delete_setting(key):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM settings WHERE key = ?", (key.strip(),))
+    conn.commit()
+    conn.close()
+
+
 def add_db_admin(user_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
