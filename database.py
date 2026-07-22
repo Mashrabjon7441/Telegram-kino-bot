@@ -130,8 +130,17 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Create movie_subscriptions table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS movie_subscriptions (
+            user_id INTEGER NOT NULL,
+            movie_code TEXT NOT NULL,
+            PRIMARY KEY(user_id, movie_code)
+        )
+    """)
     conn.commit()
     conn.close()
+
 
 
 def add_user(user_id, username, referred_by=None):
@@ -545,3 +554,44 @@ def is_db_admin(user_id):
     res = cursor.fetchone()
     conn.close()
     return res is not None
+
+# ----------------- MOVIE SUBSCRIPTIONS & RANDOM MOVIE -----------------
+
+def toggle_movie_subscription(user_id, movie_code):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM movie_subscriptions WHERE user_id = ? AND movie_code = ?", (user_id, movie_code.strip()))
+    if cursor.fetchone():
+        cursor.execute("DELETE FROM movie_subscriptions WHERE user_id = ? AND movie_code = ?", (user_id, movie_code.strip()))
+        subscribed = False
+    else:
+        cursor.execute("INSERT INTO movie_subscriptions (user_id, movie_code) VALUES (?, ?)", (user_id, movie_code.strip()))
+        subscribed = True
+    conn.commit()
+    conn.close()
+    return subscribed
+
+def is_movie_subscribed(user_id, movie_code):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM movie_subscriptions WHERE user_id = ? AND movie_code = ?", (user_id, movie_code.strip()))
+    res = cursor.fetchone()
+    conn.close()
+    return res is not None
+
+def get_movie_subscribers(movie_code):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM movie_subscriptions WHERE movie_code = ?", (movie_code.strip(),))
+    res = cursor.fetchall()
+    conn.close()
+    return [r[0] for r in res]
+
+def get_random_movie():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT code, title, caption, genre, views, is_vip FROM movies ORDER BY RANDOM() LIMIT 1")
+    res = cursor.fetchone()
+    conn.close()
+    return res
+
