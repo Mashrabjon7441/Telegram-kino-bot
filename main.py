@@ -148,15 +148,19 @@ def send_movie_card(chat_id, code, user_id):
             f"🔒 **Ushbu kino faqat 👑 Premium foydalanuvchilar uchun!**\n\n"
             f"🎬 **Kino:** {title}\n"
             f"🔑 **Kodi:** `{code}`\n\n"
-            f"💳 **Obuna Narxi:** 1 oy = **10,000 so'm**\n"
+            f"💳 **Obuna Narxlari:**\n"
+            f"• 1 oy — **10,000 so'm**\n"
+            f"• 2 oy — **18,000 so'm**\n"
+            f"• 3 oy — **25,000 so'm**\n\n"
             f"🎁 **Tekin Olish:** Yana **{rem_refs} ta** do'st taklif qiling va 1 oy **TEKIN Premium** oling!"
         )
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton(text="💳 Premium Sotib Olish (10,000 so'm)", callback_data="buy_premium"))
+        markup.add(types.InlineKeyboardButton(text="💳 Premium Sotib Olish", callback_data="buy_premium"))
+        markup.add(types.InlineKeyboardButton(text="✍️ Adminga bog'lanish", callback_data="open_support"))
         markup.add(types.InlineKeyboardButton(text="👥 Do'stlarni taklif qilish", callback_data="open_ref"))
-        markup.add(types.InlineKeyboardButton(text="✍️ Adminga murojaat qilish", callback_data="open_support"))
         bot.send_message(chat_id, vip_text, reply_markup=markup, parse_mode="Markdown")
         return
+
 
 
     database.increment_movie_views(code)
@@ -289,16 +293,18 @@ def callback_handler(call):
     elif call.data == "buy_premium":
         bot.answer_callback_query(call.id)
         msg_text = (
-            f"💳 **PREMIUM SOTIB OLISH (10,000 SO'M):**\n\n"
-            f"1. To'lovni Click / Payme / Karta orqali adminga o'tkazing.\n"
-            f"2. To'lov chekini yoki skrinshotni `✍️ Adminga Murojaat` bo'limi orqali yuboring.\n"
-            f"3. Admin chekni tekshirib, 5 minut ichida 👑 Premium faollashtirib beradi!\n\n"
-            f"💡 Yoki **10 ta do'stni taklif qilib**, avtomatik **1 oylik Tekin Premium** oling!"
+            f"💳 **PREMIUM TARIFLARI VA NARXLARI:**\n\n"
+            f"• **1 oy** — **10,000 so'm**\n"
+            f"• **2 oy** — **18,000 so'm** *(2,000 so'm tejamkorlik!)*\n"
+            f"• **3 oy** — **25,000 so'm** *(5,000 so'm tejamkorlik!)*\n\n"
+            f"💡 **TEKIN OLISH:** 10 ta do'stni taklif qiling = **1 oy TEKIN Premium**!\n\n"
+            f" Obuna bo'lish uchun pastdagi **`✍️ Adminga bog'lanish`** tugmasini bosing va adminga yozing!"
         )
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton(text="✍️ Chek yuborish (Adminga)", callback_data="open_support"))
+        markup.add(types.InlineKeyboardButton(text="✍️ Adminga bog'lanish (To'lov uchun)", callback_data="open_support"))
         markup.add(types.InlineKeyboardButton(text="👥 Do'stlarni taklif qilish", callback_data="open_ref"))
         bot.send_message(call.message.chat.id, msg_text, reply_markup=markup, parse_mode="Markdown")
+
 
     elif call.data == "open_ref":
 
@@ -646,9 +652,12 @@ def text_handler(message):
             status_str = "🆓 **Oddiy (FREE)**"
 
         msg_text = (
-            f"👑 **PREMIUM A'ZOLIK VA NARXLAR:**\n\n"
+            f"👑 **PREMIUM A'ZOLIK TARIFLARI VA NARXLAR:**\n\n"
             f"📌 **Sizning Statusingiz:** {status_str}\n\n"
-            f"💳 **Obuna Narxi:** 1 oy = **10,000 so'm**\n"
+            f"💳 **Obuna Tariflari:**\n"
+            f"• **1 oy** — **10,000 so'm**\n"
+            f"• **2 oy** — **18,000 so'm** *(2,000 so'm chegirma!)*\n"
+            f"• **3 oy** — **25,000 so'm** *(5,000 so'm chegirma!)*\n\n"
             f"🎁 **Tekin Olish Yo'li:** 10 ta do'stni taklif qilish (Yana **{rem_refs} ta** do'st taklif qilsangiz, avtomatik 1 oylik TEKIN Premium beriladi!)\n\n"
             f"🌟 **Premium Imtiyozlari:**\n"
             f"• 🚫 Majburiy kanallardan to'liq ozod bo'lish\n"
@@ -656,11 +665,12 @@ def text_handler(message):
             f"• 👑 Profilingizda oltin toj va VIP maqom\n"
         )
         markup = types.InlineKeyboardMarkup(row_width=1)
-        markup.add(types.InlineKeyboardButton(text="💳 Premium Sotib Olish (10,000 so'm)", callback_data="buy_premium"))
+        markup.add(types.InlineKeyboardButton(text="💳 Premium Sotib Olish", callback_data="buy_premium"))
+        markup.add(types.InlineKeyboardButton(text="✍️ Adminga bog'lanish", callback_data="open_support"))
         markup.add(types.InlineKeyboardButton(text="👥 Do'stlarni taklif qilish (Tekin Premium)", callback_data="open_ref"))
-        markup.add(types.InlineKeyboardButton(text="✍️ Adminga murojaat qilish", callback_data="open_support"))
         bot.send_message(message.chat.id, msg_text, reply_markup=markup, parse_mode="Markdown")
         return
+
 
 
     elif text == "✍️ Adminga Murojaat":
