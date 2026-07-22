@@ -142,19 +142,22 @@ def send_movie_card(chat_id, code, user_id):
 
     # VIP Protection Check
     if is_vip and not database.is_premium_user(user_id) and not is_admin(user_id):
+        ref_count = database.get_user_referral_count(user_id)
+        rem_refs = 10 - (ref_count % 10) if (ref_count % 10) != 0 else 10
         vip_text = (
             f"🔒 **Ushbu kino faqat 👑 Premium foydalanuvchilar uchun!**\n\n"
             f"🎬 **Kino:** {title}\n"
             f"🔑 **Kodi:** `{code}`\n\n"
-            f"💡 **Premium a'zolikni olish yo'llari:**\n"
-            f"1. **10 ta do'stingizni** taklif qiling va **AVTOMATIK 1 oylik Tekin Premium** oling!\n"
-            f"2. Adminga murojaat qiling."
+            f"💳 **Obuna Narxi:** 1 oy = **10,000 so'm**\n"
+            f"🎁 **Tekin Olish:** Yana **{rem_refs} ta** do'st taklif qiling va 1 oy **TEKIN Premium** oling!"
         )
         markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(text="💳 Premium Sotib Olish (10,000 so'm)", callback_data="buy_premium"))
         markup.add(types.InlineKeyboardButton(text="👥 Do'stlarni taklif qilish", callback_data="open_ref"))
         markup.add(types.InlineKeyboardButton(text="✍️ Adminga murojaat qilish", callback_data="open_support"))
         bot.send_message(chat_id, vip_text, reply_markup=markup, parse_mode="Markdown")
         return
+
 
     database.increment_movie_views(code)
     likes, dislikes = database.get_movie_ratings(code)
@@ -283,7 +286,22 @@ def callback_handler(call):
             )
             bot.send_message(call.message.chat.id, welcome_text, reply_markup=get_main_keyboard(user_id), parse_mode="Markdown")
 
+    elif call.data == "buy_premium":
+        bot.answer_callback_query(call.id)
+        msg_text = (
+            f"💳 **PREMIUM SOTIB OLISH (10,000 SO'M):**\n\n"
+            f"1. To'lovni Click / Payme / Karta orqali adminga o'tkazing.\n"
+            f"2. To'lov chekini yoki skrinshotni `✍️ Adminga Murojaat` bo'limi orqali yuboring.\n"
+            f"3. Admin chekni tekshirib, 5 minut ichida 👑 Premium faollashtirib beradi!\n\n"
+            f"💡 Yoki **10 ta do'stni taklif qilib**, avtomatik **1 oylik Tekin Premium** oling!"
+        )
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(text="✍️ Chek yuborish (Adminga)", callback_data="open_support"))
+        markup.add(types.InlineKeyboardButton(text="👥 Do'stlarni taklif qilish", callback_data="open_ref"))
+        bot.send_message(call.message.chat.id, msg_text, reply_markup=markup, parse_mode="Markdown")
+
     elif call.data == "open_ref":
+
         bot.answer_callback_query(call.id)
         bot_username = bot.get_me().username
         ref_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
@@ -619,27 +637,31 @@ def text_handler(message):
 
     elif text == "👑 Premium A'zolik":
         prem_info = database.get_premium_info(user_id)
+        ref_count = database.get_user_referral_count(user_id)
+        rem_refs = 10 - (ref_count % 10) if (ref_count % 10) != 0 else 10
+
         if prem_info:
             status_str = f"✅ **FAOL** 👑\n📅 Muddati: **{prem_info}**"
         else:
             status_str = "🆓 **Oddiy (FREE)**"
 
         msg_text = (
-            f"👑 **Premium A'zolik Statusi:**\n\n"
-            f"{status_str}\n\n"
+            f"👑 **PREMIUM A'ZOLIK VA NARXLAR:**\n\n"
+            f"📌 **Sizning Statusingiz:** {status_str}\n\n"
+            f"💳 **Obuna Narxi:** 1 oy = **10,000 so'm**\n"
+            f"🎁 **Tekin Olish Yo'li:** 10 ta do'stni taklif qilish (Yana **{rem_refs} ta** do'st taklif qilsangiz, avtomatik 1 oylik TEKIN Premium beriladi!)\n\n"
             f"🌟 **Premium Imtiyozlari:**\n"
             f"• 🚫 Majburiy kanallardan to'liq ozod bo'lish\n"
             f"• 🔒 VIP Kinolarni cheklovlarsiz tomosha qilish\n"
-            f"• 👑 Profilizda oltin toj va VIP maqom\n\n"
-            f"💡 **Premium olish yo'li:**\n"
-            f"1. **10 ta do'stingizni** taklif qiling (Referal orqali tekin 1 oy oling).\n"
-            f"2. Adminga murojaat qiling."
+            f"• 👑 Profilingizda oltin toj va VIP maqom\n"
         )
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton(text="👥 Do'stlarni taklif qilish", callback_data="open_ref"))
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(types.InlineKeyboardButton(text="💳 Premium Sotib Olish (10,000 so'm)", callback_data="buy_premium"))
+        markup.add(types.InlineKeyboardButton(text="👥 Do'stlarni taklif qilish (Tekin Premium)", callback_data="open_ref"))
         markup.add(types.InlineKeyboardButton(text="✍️ Adminga murojaat qilish", callback_data="open_support"))
         bot.send_message(message.chat.id, msg_text, reply_markup=markup, parse_mode="Markdown")
         return
+
 
     elif text == "✍️ Adminga Murojaat":
         msg = bot.send_message(message.chat.id, "✍️ Adminga yubormoqchi bo'lgan murojaatingiz yoki savolingizni yozib yuboring (Text, rasm yoki audio):")
