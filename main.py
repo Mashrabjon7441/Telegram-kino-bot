@@ -20,6 +20,8 @@ GENRES = ["💥 Jangari", "😂 Komediya", "❤️ Melodrama", "🦁 Multfilm", 
 
 # Temporary state storage
 admin_states = {}
+pending_channel_videos = {}
+
 
 def is_super_admin(user_id):
     return user_id in config.ADMIN_IDS
@@ -491,8 +493,124 @@ def callback_handler(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, "Reklama yuborish bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
 
+    elif call.data.startswith("fill_video:"):
+        video_key = call.data.split(":", 1)[1]
+        file_id = pending_channel_videos.get(video_key)
+        if not file_id:
+            bot.answer_callback_query(call.id, "❌ Ushbu video topilmadi yoki allaqachon saqlangan!", show_alert=True)
+            return
+
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(call.message.chat.id, "🎬 **Ushbu kino uchun nom (sarlavha) kiriting:**")
+        bot.register_next_step_handler(msg, process_pending_video_title, video_key)
+
+    elif call.data.startswith("select_pending_genre:"):
+        genre = call.data.split(":")[1]
+        video_key = admin_states.get(user_id, {}).get('pending_key')
+        title = admin_states.get(user_id, {}).get('title', 'Kino')
+        caption = admin_states.get(user_id, {}).get('caption', '')
+
+        file_id = pending_channel_videos.pop(video_key, None)
+        if not file_id:
+            bot.answer_callback_query(call.id, "❌ Video fayli topilmadi!", show_alert=True)
+            return
+
+        code = generate_unique_code()
+        database.add_movie(code, title, caption, genre)
+        database.add_episode(code, "To'liq film", file_id)
+
+        bot.answer_callback_query(call.id, "✅ Saqlandi!")
+        bot.send_message(
+            call.message.chat.id,
+            f"🎉 **Kino muvaffaqiyatli saqlandi!**\n\n🎬 **Nomi:** {title}\n🎭 **Janr:** {genre}\n🔑 **Biriktirilgan Kod:** `{code}`",
+            parse_mode="Markdown",
+            reply_markup=get_admin_keyboard(user_id)
+        )
+
+# ----------------- CHANNEL AUTO-IMPORT HANDLER -----------------
+
+@bot.channel_post_handler(content_types=['video', 'document'])
+def handle_channel_movie_post(message):
+    file_id = None
+    if message.video:
+        file_id = message.video.file_id
+    elif message.document:
+        file_id = message.document.file_id
+
+    if not file_id:
+        return
+
+    caption = message.caption.strip() if message.caption else ""
+
+    # Case A: Post HAS caption
+    if caption:
+        lines = [line.strip() for line in caption.split("\n") if line.strip()]
+        raw_title = lines[0] if lines else "Kino"
+        
+        # Clean title from hashtags
+        clean_title = " ".join([word for word in raw_title.split() if not word.startswith("#")])
+        if not clean_title:
+            clean_title = raw_title
+
+        # Auto-detect genre from hashtag if present
+        detected_genre = "🌐 Boshqa"
+        caption_lower = caption.lower()
+        if "#jangari" in caption_lower or "#action" in caption_lower:
+            detected_genre = "💥 Jangari"
+        elif "#komediya" in caption_lower or "#comedy" in caption_lower:
+            detected_genre = "😂 Komediya"
+        elif "#melodrama" in caption_lower or "#romance" in caption_lower:
+            detected_genre = "❤️ Melodrama"
+        elif "#multfilm" in caption_lower or "#cartoon" in caption_lower:
+            detected_genre = "🦁 Multfilm"
+        elif "#fantastika" in caption_lower or "#scifi" in caption_lower:
+            detected_genre = "🚀 Fantastika"
+        elif "#qorqinchli" in caption_lower or "#horror" in caption_lower:
+            detected_genre = "👻 Qo'rqinchli"
+        elif "#drama" in caption_lower:
+            detected_genre = "🎭 Drama"
+
+        description = "\n".join(lines[1:]) if len(lines) > 1 else ""
+
+        code = generate_unique_code()
+        database.add_movie(code, clean_title, description, detected_genre)
+        database.add_episode(code, "To'liq film", file_id)
+
+        # Notify Super Admins
+        notice_text = (
+            f"📥 **MANBA KANALIDAN YANGI KINO AVTOMATIK SAQLANDI!**\n\n"
+            f"🎬 **Nomi:** {clean_title}\n"
+            f"🎭 **Janr:** {detected_genre}\n"
+            f"🔑 **Biriktirilgan Kod:** `{code}`\n\n"
+            f"*(Foydalanuvchilar `{code}` kodi orqali ko'rishlari mumkin)*"
+        )
+        for admin_id in config.ADMIN_IDS:
+            try:
+                bot.send_message(admin_id, notice_text, parse_mode="Markdown")
+            except Exception as e:
+                print(f"Failed to notify admin {admin_id}: {e}")
+
+    # Case B: Post HAS NO caption (Nameless video)
+    else:
+        video_key = f"v_{message.chat.id}_{message.message_id}"
+        pending_channel_videos[video_key] = file_id
+
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(text="✍️ Nom va Ma'lumot Kiritish", callback_data=f"fill_video:{video_key}"))
+
+        alert_text = (
+            f"⚠️ **MANBA KANALIGA NOMSIZ VIDEO TASHLANDI!**\n\n"
+            f"Ushbu kino hali bot bazasiga saqlanmadi. Iltimos, kino nomini kiritish uchun pastdagi tugmani bosing:"
+        )
+        for admin_id in config.ADMIN_IDS:
+            try:
+                bot.send_message(admin_id, alert_text, reply_markup=markup, parse_mode="Markdown")
+            except Exception as e:
+                print(f"Failed to notify admin {admin_id}: {e}")
+
 # Inline Query Handler for Telegram Inline Search
 @bot.inline_handler(func=lambda query: True)
+
 def inline_query_handler(query):
     text = query.query.strip()
     results = []
@@ -915,7 +1033,35 @@ def process_toggle_vip_movie(message):
     else:
         bot.send_message(message.chat.id, f"❌ `{code}` kodli kino topilmadi.", reply_markup=get_admin_keyboard(user_id))
 
+def process_pending_video_title(message, video_key):
+    user_id = message.from_user.id
+    title = message.text.strip() if message.text else ""
+    if not title or title.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Kino saqlash bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    admin_states[user_id] = {'pending_key': video_key, 'title': title}
+    msg = bot.send_message(message.chat.id, "Tavsifini kiriting (Yoki bekor qilmoqchi bo'lsangiz '-' kiriting):")
+    bot.register_next_step_handler(msg, process_pending_video_caption)
+
+def process_pending_video_caption(message):
+    user_id = message.from_user.id
+    caption = message.text.strip() if message.text else ""
+    if caption == '-':
+        caption = ""
+
+    if user_id not in admin_states:
+        admin_states[user_id] = {}
+    admin_states[user_id]['caption'] = caption
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    btns = [types.InlineKeyboardButton(text=g, callback_data=f"select_pending_genre:{g}") for g in GENRES]
+    markup.add(*btns)
+
+    bot.send_message(message.chat.id, "🎭 **Kino janrini tanlang:**", reply_markup=markup, parse_mode="Markdown")
+
 # ----------------- ADMIN WORKFLOWS -----------------
+
 
 def process_set_admin_promo_code(message):
     user_id = message.from_user.id
