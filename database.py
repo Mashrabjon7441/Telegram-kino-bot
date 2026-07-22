@@ -138,8 +138,19 @@ def init_db():
             PRIMARY KEY(user_id, movie_code)
         )
     """)
+    # Create pending_queue table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pending_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            queue_num INTEGER NOT NULL,
+            file_id TEXT NOT NULL,
+            status TEXT DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     conn.commit()
     conn.close()
+
 
 
 
@@ -609,31 +620,52 @@ def restore_db_from_bytes(data):
         return False
 
 def trigger_auto_backup(bot_instance):
-    import threading
+    # Database changes are saved locally in movies.db
+    pass
 
-    def _run_backup():
-        try:
-            if not os.path.exists(DB_NAME):
-                return
-            import config
-            for admin_id in config.ADMIN_IDS:
-                try:
-                    with open(DB_NAME, 'rb') as doc:
-                        msg = bot_instance.send_document(
-                            admin_id,
-                            doc,
-                            caption="#AUTO_DB_BACKUP 📦 Avtomatik zaxira nusxasi"
-                        )
-                        if msg and msg.document:
-                            set_setting('latest_backup_file_id', msg.document.file_id)
-                    print(f"Auto-backup successfully sent to admin {admin_id}")
-                    break
-                except Exception as e:
-                    print(f"Failed sending auto-backup to admin {admin_id}: {e}")
-        except Exception as ex:
-            print(f"Error in _run_backup: {ex}")
 
-    threading.Thread(target=_run_backup, daemon=True).start()
+# ----------------- PENDING QUEUE HELPERS -----------------
+
+def add_to_pending_queue(file_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COALESCE(MAX(queue_num), 0) + 1 FROM pending_queue")
+    next_num = cursor.fetchone()[0]
+    cursor.execute("INSERT INTO pending_queue (queue_num, file_id, status) VALUES (?, ?, 'pending')", (next_num, file_id))
+    conn.commit()
+    conn.close()
+    return next_num
+
+def get_pending_queue_count():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM pending_queue WHERE status = 'pending'")
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
+
+def get_next_pending_video():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, queue_num, file_id FROM pending_queue WHERE status = 'pending' ORDER BY queue_num ASC LIMIT 1")
+    res = cursor.fetchone()
+    conn.close()
+    return res
+
+def mark_pending_fulfilled(pending_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE pending_queue SET status = 'fulfilled' WHERE id = ?", (pending_id,))
+    conn.commit()
+    conn.close()
+
+def clear_pending_queue():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM pending_queue WHERE status = 'pending'")
+    conn.commit()
+    conn.close()
+
 
 
 

@@ -76,20 +76,20 @@ def get_admin_keyboard(user_id):
     btn_stats = types.KeyboardButton("📊 Statistika")
     btn_channels = types.KeyboardButton("📢 Homiylar / Kanallar")
     btn_source_ch = types.KeyboardButton("📡 Manba Kanalini Sozlash")
+    btn_queue = types.KeyboardButton("📥 Kutilayotgan Kinolar")
     btn_adv = types.KeyboardButton("✉️ Reklama yuborish")
     btn_post_gen = types.KeyboardButton("📢 Post Generator")
     btn_auto_post = types.KeyboardButton("📢 1-Click Kanalga Joylash")
     btn_vip_mgmt = types.KeyboardButton("🔒 VIP Kinolarni Boshqarish")
     btn_prem_mgmt = types.KeyboardButton("👑 Premium Boshqaruvi")
-    btn_backup = types.KeyboardButton("📦 Bazani Zaxiralash (Backup)")
     btn_back = types.KeyboardButton("⬅️ Bosh sahifa")
     
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
-    keyboard.row(btn_channels, btn_source_ch)
-    keyboard.row(btn_adv, btn_post_gen)
-    keyboard.row(btn_auto_post, btn_vip_mgmt)
-    keyboard.row(btn_prem_mgmt, btn_backup)
+    keyboard.row(btn_queue, btn_source_ch)
+    keyboard.row(btn_channels, btn_adv)
+    keyboard.row(btn_post_gen, btn_auto_post)
+    keyboard.row(btn_vip_mgmt, btn_prem_mgmt)
     
     if is_super_admin(user_id):
         btn_promo = types.KeyboardButton("🔑 Admin kodi yaratish")
@@ -97,6 +97,7 @@ def get_admin_keyboard(user_id):
         
     keyboard.row(btn_back)
     return keyboard
+
 
 
 
@@ -531,20 +532,49 @@ def callback_handler(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, "Reklama yuborish bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
 
-    elif call.data == "db_backup_now":
-        bot.answer_callback_query(call.id, "Baza zaxiralanmoqda...")
-        db_path = database.get_db_path()
-        try:
-            with open(db_path, 'rb') as doc:
-                bot.send_document(call.message.chat.id, doc, caption="#DB_BACKUP 📦 Ma'lumotlar bazasi (movies.db) zaxira nusxasi")
-            bot.send_message(call.message.chat.id, "✅ **Baza muvaffaqiyatli Telegramga zaxiralandi!**", parse_mode="Markdown")
-        except Exception as e:
-            bot.send_message(call.message.chat.id, f"❌ Zaxiralashda xatolik: {e}")
-
-    elif call.data == "db_restore_prompt":
+    elif call.data == "start_batch_naming":
         bot.answer_callback_query(call.id)
-        msg = bot.send_message(call.message.chat.id, "📥 **Iltimos, zaxiradagi `movies.db` faylini ushbu xabarga yuboring:**", parse_mode="Markdown")
-        bot.register_next_step_handler(msg, process_db_restore_file)
+        ask_next_batch_movie(call.message.chat.id, user_id)
+
+    elif call.data == "pause_batch_naming":
+        bot.answer_callback_query(call.id, "⏸ Jarayon to'xtatildi")
+        admin_states.pop(user_id, None)
+        bot.send_message(
+            call.message.chat.id,
+            "⏸ **Nomlash jarayoni to'xtatildi!**\n\nSiz `📥 Kutilayotgan Kinolar` ➔ `▶️ Davom Ettirish` tugmasi orqali keyinroq qolgan joyingizdan davom ettirishingiz mumkin.",
+            parse_mode="Markdown",
+            reply_markup=get_admin_keyboard(user_id)
+        )
+
+    elif call.data == "clear_batch_queue":
+        database.clear_pending_queue()
+        bot.answer_callback_query(call.id, "Navbat tozalandi")
+        bot.send_message(call.message.chat.id, "✅ Kutilayotgan kinolar navbati tozalandi.", reply_markup=get_admin_keyboard(user_id))
+
+    elif call.data.startswith("select_batch_genre:"):
+        genre = call.data.split(":")[1]
+        state = admin_states.get(user_id, {})
+        pending_id = state.get('pending_id')
+        queue_num = state.get('queue_num')
+        file_id = state.get('file_id')
+        title = state.get('title')
+        caption = state.get('caption', '')
+
+        if not pending_id or not file_id or not title:
+            bot.answer_callback_query(call.id, "❌ Ma'lumot topilmadi!", show_alert=True)
+            return
+
+        code = generate_unique_code()
+        database.add_movie(code, title, caption, genre)
+        database.add_episode(code, "To'liq film", file_id)
+        database.mark_pending_fulfilled(pending_id)
+
+        bot.answer_callback_query(call.id, f"✅ Kino #{queue_num} saqlandi!")
+        bot.send_message(call.message.chat.id, f"✅ **Kino #{queue_num}** (*{title}*) saqlandi! (🔑 Kod: `{code}`)", parse_mode="Markdown")
+
+        # Automatically ask for the next pending movie in queue!
+        ask_next_batch_movie(call.message.chat.id, user_id)
+
 
     elif call.data.startswith("fill_video:"):
 
@@ -655,23 +685,20 @@ def handle_channel_movie_post(message):
             except Exception as e:
                 print(f"Failed to notify admin {admin_id}: {e}")
 
-    # Case B: Post HAS NO caption (Nameless video)
+    # Case B: Post HAS NO caption (Nameless video -> added to pending_queue)
     else:
-        video_key = f"v_{message.chat.id}_{message.message_id}"
-        pending_channel_videos[video_key] = file_id
-
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton(text="✍️ Nom va Ma'lumot Kiritish", callback_data=f"fill_video:{video_key}"))
-
+        q_num = database.add_to_pending_queue(file_id)
         alert_text = (
-            f"⚠️ **MANBA KANALIGA NOMSIZ VIDEO TASHLANDI!**\n\n"
-            f"Ushbu kino hali bot bazasiga saqlanmadi. Iltimos, kino nomini kiritish uchun pastdagi tugmani bosing:"
+            f"📥 **MANBA KANALIGA NOMSIZ VIDEO JOYLASHDI!**\n\n"
+            f"📌 **Kino #{q_num}** sifatida navbatga qo'shildi.\n"
+            f"Siz uni **`📥 Kutilayotgan Kinolar`** bo'limi orqali ketma-ket nomlashingiz mumkin."
         )
         for admin_id in config.ADMIN_IDS:
             try:
-                bot.send_message(admin_id, alert_text, reply_markup=markup, parse_mode="Markdown")
+                bot.send_message(admin_id, alert_text, parse_mode="Markdown")
             except Exception as e:
                 print(f"Failed to notify admin {admin_id}: {e}")
+
 
 # Inline Query Handler for Telegram Inline Search
 @bot.inline_handler(func=lambda query: True)
@@ -956,24 +983,29 @@ def text_handler(message):
         bot.register_next_step_handler(msg, process_set_source_channel)
         return
 
-    elif (text == "📦 Bazani Zaxiralash (Backup)" or text == "📦 Bazani Zaxiralash") and is_admin(user_id):
+    elif (text == "📥 Kutilayotgan Kinolar" or text == "📥 Kutilayotgan Kinolar (Queue)") and is_admin(user_id):
+        pending_count = database.get_pending_queue_count()
+        if pending_count == 0:
+            bot.send_message(message.chat.id, "📥 **Hozirda kutilayotgan nomsiz kinolar yo'q.**", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+            return
+
         markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(
-            types.InlineKeyboardButton(text="📤 Bazani Telegramga Saqlash (Backup)", callback_data="db_backup_now"),
-            types.InlineKeyboardButton(text="📥 Bazani Tiklash (Restore)", callback_data="db_restore_prompt")
+            types.InlineKeyboardButton(text=f"▶️ Nomlashni Boshlash / Davom Ettirish ({pending_count} ta)", callback_data="start_batch_naming"),
+            types.InlineKeyboardButton(text="❌ Navbatni Tozalash", callback_data="clear_batch_queue")
         )
         bot.send_message(
             message.chat.id,
-            "📦 **MA'LUMOTLAR BAZASI (SQLITE) BOSHQARUVI:**\n\n"
-            "• Server xotirasida faqat matnlar va kodlar saqlanadi (baza hajmi 1 MB dan ham kam!).\n"
-            "• Videolar Telegram serverlarida bepul saqlanadi va serverda joy egallamaydi!\n\n"
-            "Server reboot bo'lganida ma'lumotlarni yo'qotmaslik uchun zaxira (backup) oling yoki tiklang:",
+            f"📥 **KUTILAYOTGAN KINOLAR NAVBATI:**\n\n"
+            f"Hozirda **{pending_count} ta** nomsiz kino navbatda turibdi (Kino #1, Kino #2...).\n\n"
+            f"Ketma-ket nomlab saqlash uchun pastdagi tugmani bosing:",
             reply_markup=markup,
             parse_mode="Markdown"
         )
         return
 
     elif text == "⬅️ Admin panelga qaytish" and is_admin(user_id):
+
 
 
         bot.send_message(message.chat.id, "Admin panelga qaytdingiz:", reply_markup=get_admin_keyboard(user_id))
@@ -1116,7 +1148,94 @@ def process_admin_premium_command(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"Xatolik yuz berdi: {e}", reply_markup=get_admin_keyboard(user_id))
 
+def ask_next_batch_movie(chat_id, user_id):
+    next_item = database.get_next_pending_video()
+    if not next_item:
+        bot.send_message(chat_id, "🎉 **BARCHA KUTILAYOTGAN KINOLAR NOMLANDI VA SAQLANDI!**", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+        admin_states.pop(user_id, None)
+        return
+
+    pending_id, queue_num, file_id = next_item
+    admin_states[user_id] = {
+        'pending_id': pending_id,
+        'queue_num': queue_num,
+        'file_id': file_id
+    }
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton(text="⏸ To'xtatish (Pause)", callback_data="pause_batch_naming"))
+
+    msg = bot.send_message(
+        chat_id,
+        f"🎬 **KINO #{queue_num}** (Navbatdagi kutilayotgan kino):\n\n"
+        f"Iltimos, ushbu kino uchun **nom (sarlavha)** kiriting:\n\n"
+        f"*(Bekor qilish uchun 'bekor' deb yozing)*",
+        reply_markup=markup,
+        parse_mode="Markdown"
+    )
+    bot.register_next_step_handler(msg, process_batch_movie_title)
+
+def process_batch_movie_title(message):
+    user_id = message.from_user.id
+    if message.text and message.text.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Nomlash to'xtatildi.", reply_markup=get_admin_keyboard(user_id))
+        admin_states.pop(user_id, None)
+        return
+
+    title = message.text.strip() if message.text else ""
+    if not title:
+        msg = bot.send_message(message.chat.id, "Xato: Bo'sh matn. Iltimos, kino nomini kiriting:")
+        bot.register_next_step_handler(msg, process_batch_movie_title)
+        return
+
+    if user_id not in admin_states:
+        bot.send_message(message.chat.id, "Jarayon to'xtatilgan.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    admin_states[user_id]['title'] = title
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton(text="⏸ To'xtatish (Pause)", callback_data="pause_batch_naming"))
+
+    msg = bot.send_message(
+        message.chat.id,
+        f"📝 **Kino #{admin_states[user_id]['queue_num']}** (*{title}*) uchun tavsif kiriting:\n"
+        f"*(Tavsifsiz qoldirish uchun `-` belgisini yuboring)*",
+        reply_markup=markup,
+        parse_mode="Markdown"
+    )
+    bot.register_next_step_handler(msg, process_batch_movie_caption)
+
+def process_batch_movie_caption(message):
+    user_id = message.from_user.id
+    if message.text and message.text.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Nomlash to'xtatildi.", reply_markup=get_admin_keyboard(user_id))
+        admin_states.pop(user_id, None)
+        return
+
+    caption = message.text.strip() if message.text else ""
+    if caption == '-':
+        caption = ""
+
+    if user_id not in admin_states:
+        bot.send_message(message.chat.id, "Jarayon to'xtatilgan.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    admin_states[user_id]['caption'] = caption
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    btns = [types.InlineKeyboardButton(text=g, callback_data=f"select_batch_genre:{g}") for g in GENRES]
+    markup.add(*btns)
+    markup.add(types.InlineKeyboardButton(text="⏸ To'xtatish (Pause)", callback_data="pause_batch_naming"))
+
+    bot.send_message(
+        message.chat.id,
+        f"🎭 **Kino #{admin_states[user_id]['queue_num']}** uchun janr tanlang:",
+        reply_markup=markup,
+        parse_mode="Markdown"
+    )
+
 def process_toggle_vip_movie(message):
+
     user_id = message.from_user.id
     code = message.text.strip() if message.text else ""
     if not code or code.lower() == 'bekor':
