@@ -479,12 +479,14 @@ def callback_handler(call):
         code = generate_unique_code()
         success = database.add_movie(code, title, caption, genre)
         if success:
+            database.trigger_auto_backup(bot)
             bot.send_message(
                 call.message.chat.id,
                 f"✅ Yangi kino yaratildi!\n🔑 Biriktirilgan Kod: `{code}`\n🎬 Nomi: *{title}*\n🎭 Janr: *{genre}*\n\nEndi ushbu kod ostiga qismlarini (video fayllarini) yuklaymiz.",
                 parse_mode="Markdown"
             )
             ask_for_episode_file(call.message, code)
+
         else:
             bot.send_message(call.message.chat.id, "Xatolik yuz berdi ma'lumotlar bazasida.", reply_markup=get_admin_keyboard(user_id))
 
@@ -570,6 +572,7 @@ def callback_handler(call):
         code = generate_unique_code()
         database.add_movie(code, title, caption, genre)
         database.add_episode(code, "To'liq film", file_id)
+        database.trigger_auto_backup(bot)
 
         bot.answer_callback_query(call.id, "✅ Saqlandi!")
         bot.send_message(
@@ -635,6 +638,8 @@ def handle_channel_movie_post(message):
         code = generate_unique_code()
         database.add_movie(code, clean_title, description, detected_genre)
         database.add_episode(code, "To'liq film", file_id)
+        database.trigger_auto_backup(bot)
+
 
         # Notify Super Admins
         notice_text = (
@@ -1444,6 +1449,34 @@ def keep_alive_pinger():
         except Exception as e:
             print(f"Keep-alive auto-ping error: {e}")
 
+def auto_restore_on_startup():
+
+    try:
+        movies = database.get_all_movies()
+        if movies:
+            print(f"Database contains {len(movies)} movies. Auto-restore not needed.")
+            return
+
+        print("Database is empty on startup. Attempting auto-restore from Telegram Cloud...")
+        latest_file_id = database.get_setting('latest_backup_file_id')
+        if latest_file_id:
+            try:
+                file_info = bot.get_file(latest_file_id)
+                downloaded_data = bot.download_file(file_info.file_path)
+                success = database.restore_db_from_bytes(downloaded_data)
+                if success:
+                    restored_count = len(database.get_all_movies())
+                    print(f"🎉 AUTO-RESTORE SUCCESSFUL! Restored {restored_count} movies from Telegram Cloud!")
+                    for admin_id in config.ADMIN_IDS:
+                        try:
+                            bot.send_message(admin_id, f"🎉 **SERVER AVTOMATIK TIKLANDI!**\n\nTelegram Bulutidan barcha **{restored_count} ta** kinolar va kodlar avtomatik tiklab olindi!", parse_mode="Markdown")
+                        except Exception:
+                            pass
+            except Exception as err:
+                print(f"Failed auto-restore download: {err}")
+    except Exception as e:
+        print(f"Error in auto_restore_on_startup: {e}")
+
 # Start polling
 if __name__ == '__main__':
     web_thread = threading.Thread(target=start_health_check_server, daemon=True)
@@ -1452,5 +1485,8 @@ if __name__ == '__main__':
     ping_thread = threading.Thread(target=keep_alive_pinger, daemon=True)
     ping_thread.start()
 
+    auto_restore_on_startup()
+
     print("Bot ishga tushmoqda...")
     bot.infinity_polling()
+

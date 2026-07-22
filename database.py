@@ -608,4 +608,32 @@ def restore_db_from_bytes(data):
         print(f"Error restoring DB: {e}")
         return False
 
+def trigger_auto_backup(bot_instance):
+    import threading
+
+    def _run_backup():
+        try:
+            if not os.path.exists(DB_NAME):
+                return
+            import config
+            for admin_id in config.ADMIN_IDS:
+                try:
+                    with open(DB_NAME, 'rb') as doc:
+                        msg = bot_instance.send_document(
+                            admin_id,
+                            doc,
+                            caption="#AUTO_DB_BACKUP 📦 Avtomatik zaxira nusxasi"
+                        )
+                        if msg and msg.document:
+                            set_setting('latest_backup_file_id', msg.document.file_id)
+                    print(f"Auto-backup successfully sent to admin {admin_id}")
+                    break
+                except Exception as e:
+                    print(f"Failed sending auto-backup to admin {admin_id}: {e}")
+        except Exception as ex:
+            print(f"Error in _run_backup: {ex}")
+
+    threading.Thread(target=_run_backup, daemon=True).start()
+
+
 
