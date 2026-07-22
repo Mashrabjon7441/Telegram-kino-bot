@@ -34,9 +34,34 @@ Loyihani ishga tushirish uchun konsolda quyidagi buyruqni bering:
 python main.py
 ```
 
-## Admin foydalanish qo'llanmasi
 
-### Reklama tarqatish:
-1. `⚙️ Admin panel` -> **`✉️ Reklama yuborish`** tugmasini tanlang.
-2. Botga reklama postini yuboring. Unda rasm, video, matn bo'lishi yoki boshqa kanaldan forward-xabar bo'lishi ham mumkin.
-3. Bot tasdiqlash uchun inline tugma yuboradi. `✅ Tasdiqlash` tugmasini bossangiz, reklama barcha foydalanuvchilarga jo'natiladi va yakunida hisobot chiqariladi.
+
+## Render.com serveriga deploy qilish yo'riqnomasi
+
+1. **GitHub repository yaratish va kodlarni yuklash:**
+   - GitHub.com saytida yangi repository yarating (Masalan: `telegram-kino-bot`).
+   - Terminalda ushbu buyruqlarni ketma-ket bajaring:
+     ```bash
+     git add .
+     git commit -m "Deploy for Render"
+     git remote add origin https://github.com/USERNAME/telegram-kino-bot.git
+     git branch -M main
+     git push -u origin main
+     ```
+
+2. **Render.com ga ulash:**
+   - [Render.com](https://render.com) saytiga kiring va akkountingizga kiring.
+   - **New +** tugmasini bosing va **Background Worker** xizmatini tanlang.
+   - GitHub repongizni tanlang.
+   - Sozlamalarda:
+     - **Name**: `telegram-kino-bot`
+     - **Environment**: `Python 3`
+     - **Build Command**: `pip install -r requirements.txt`
+     - **Start Command**: `python main.py`
+   - **Environment Variables** bo'limida quyidagi o'zgaruvchilarni qo'shing:
+     - `BOT_TOKEN`: BotFather'dan olingan bot tokeningiz
+     - `ADMIN_IDS`: Telegram ID ingiz (masalan: `7637932499`)
+   - **Create Background Worker** tugmasini bosing.
+
+Bot 24/7 rejimida Render serverida ishlay boshlaydi!
+
