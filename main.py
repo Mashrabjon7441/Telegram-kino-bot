@@ -624,7 +624,6 @@ def handle_channel_movie_post(message):
             return
 
     file_id = None
-
     if message.video:
         file_id = message.video.file_id
     elif message.document:
@@ -634,70 +633,29 @@ def handle_channel_movie_post(message):
         return
 
     caption = message.caption.strip() if message.caption else ""
+    title_extracted = ""
+    desc_extracted = ""
 
-    # Case A: Post HAS caption
     if caption:
         lines = [line.strip() for line in caption.split("\n") if line.strip()]
-        raw_title = lines[0] if lines else "Kino"
-        
-        # Clean title from hashtags
+        raw_title = lines[0] if lines else ""
         clean_title = " ".join([word for word in raw_title.split() if not word.startswith("#")])
-        if not clean_title:
-            clean_title = raw_title
+        title_extracted = clean_title if clean_title else raw_title
+        desc_extracted = "\n".join(lines[1:]) if len(lines) > 1 else ""
 
-        # Auto-detect genre from hashtag if present
-        detected_genre = "🌐 Boshqa"
-        caption_lower = caption.lower()
-        if "#jangari" in caption_lower or "#action" in caption_lower:
-            detected_genre = "💥 Jangari"
-        elif "#komediya" in caption_lower or "#comedy" in caption_lower:
-            detected_genre = "😂 Komediya"
-        elif "#melodrama" in caption_lower or "#romance" in caption_lower:
-            detected_genre = "❤️ Melodrama"
-        elif "#multfilm" in caption_lower or "#cartoon" in caption_lower:
-            detected_genre = "🦁 Multfilm"
-        elif "#fantastika" in caption_lower or "#scifi" in caption_lower:
-            detected_genre = "🚀 Fantastika"
-        elif "#qorqinchli" in caption_lower or "#horror" in caption_lower:
-            detected_genre = "👻 Qo'rqinchli"
-        elif "#drama" in caption_lower:
-            detected_genre = "🎭 Drama"
+    q_num = database.add_to_pending_queue(file_id, title=title_extracted, caption=desc_extracted)
 
-        description = "\n".join(lines[1:]) if len(lines) > 1 else ""
+    alert_text = (
+        f"📥 **MANBA KANALIDAN YANGI KINO KELDI!**\n\n"
+        f"📌 **Kino #{q_num}** sifatida kutilayotganlar navbatiga qo'shildi.\n"
+        f"*(Siz uni **`📥 Kutilayotgan Kinolar`** bo'limi orqali nomlashingiz va kod biriktirishingiz mumkin)*"
+    )
+    for admin_id in config.ADMIN_IDS:
+        try:
+            bot.send_message(admin_id, alert_text, parse_mode="Markdown")
+        except Exception as e:
+            print(f"Failed to notify admin {admin_id}: {e}")
 
-        code = generate_unique_code()
-        database.add_movie(code, clean_title, description, detected_genre)
-        database.add_episode(code, "To'liq film", file_id)
-        database.trigger_auto_backup(bot)
-
-
-        # Notify Super Admins
-        notice_text = (
-            f"📥 **MANBA KANALIDAN YANGI KINO AVTOMATIK SAQLANDI!**\n\n"
-            f"🎬 **Nomi:** {clean_title}\n"
-            f"🎭 **Janr:** {detected_genre}\n"
-            f"🔑 **Biriktirilgan Kod:** `{code}`\n\n"
-            f"*(Foydalanuvchilar `{code}` kodi orqali ko'rishlari mumkin)*"
-        )
-        for admin_id in config.ADMIN_IDS:
-            try:
-                bot.send_message(admin_id, notice_text, parse_mode="Markdown")
-            except Exception as e:
-                print(f"Failed to notify admin {admin_id}: {e}")
-
-    # Case B: Post HAS NO caption (Nameless video -> added to pending_queue)
-    else:
-        q_num = database.add_to_pending_queue(file_id)
-        alert_text = (
-            f"📥 **MANBA KANALIGA NOMSIZ VIDEO JOYLASHDI!**\n\n"
-            f"📌 **Kino #{q_num}** sifatida navbatga qo'shildi.\n"
-            f"Siz uni **`📥 Kutilayotgan Kinolar`** bo'limi orqali ketma-ket nomlashingiz mumkin."
-        )
-        for admin_id in config.ADMIN_IDS:
-            try:
-                bot.send_message(admin_id, alert_text, parse_mode="Markdown")
-            except Exception as e:
-                print(f"Failed to notify admin {admin_id}: {e}")
 
 
 # Inline Query Handler for Telegram Inline Search
@@ -1155,19 +1113,25 @@ def ask_next_batch_movie(chat_id, user_id):
         admin_states.pop(user_id, None)
         return
 
-    pending_id, queue_num, file_id = next_item
+    pending_id, queue_num, file_id, default_title, default_caption = next_item
     admin_states[user_id] = {
         'pending_id': pending_id,
         'queue_num': queue_num,
-        'file_id': file_id
+        'file_id': file_id,
+        'default_title': default_title,
+        'default_caption': default_caption
     }
 
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text="⏸ To'xtatish (Pause)", callback_data="pause_batch_naming"))
 
+    suggestion_prompt = ""
+    if default_title:
+        suggestion_prompt = f"\n📌 **Kanaldan kelgan nom:** `{default_title}`\n*(Ushbu nom bilan saqlash uchun `+` belgisini yuboring yoki yangi nom yozing)*\n"
+
     msg = bot.send_message(
         chat_id,
-        f"🎬 **KINO #{queue_num}** (Navbatdagi kutilayotgan kino):\n\n"
+        f"🎬 **KINO #{queue_num}** (Navbatdagi kutilayotgan kino):{suggestion_prompt}\n"
         f"Iltimos, ushbu kino uchun **nom (sarlavha)** kiriting:\n\n"
         f"*(Bekor qilish uchun 'bekor' deb yozing)*",
         reply_markup=markup,
@@ -1182,8 +1146,8 @@ def process_batch_movie_title(message):
         admin_states.pop(user_id, None)
         return
 
-    title = message.text.strip() if message.text else ""
-    if not title:
+    raw_input = message.text.strip() if message.text else ""
+    if not raw_input:
         msg = bot.send_message(message.chat.id, "Xato: Bo'sh matn. Iltimos, kino nomini kiriting:")
         bot.register_next_step_handler(msg, process_batch_movie_title)
         return
@@ -1192,18 +1156,25 @@ def process_batch_movie_title(message):
         bot.send_message(message.chat.id, "Jarayon to'xtatilgan.", reply_markup=get_admin_keyboard(user_id))
         return
 
+    def_title = admin_states[user_id].get('default_title', '')
+    title = def_title if (raw_input == '+' and def_title) else raw_input
+
     admin_states[user_id]['title'] = title
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text="⏸ To'xtatish (Pause)", callback_data="pause_batch_naming"))
 
+    def_cap = admin_states[user_id].get('default_caption', '')
+    cap_suggestion = f"\n📌 **Kanaldan kelgan tavsif:** `{def_cap[:60]}...` (Shu tavsifni saqlash uchun `+` yuboring)\n" if def_cap else ""
+
     msg = bot.send_message(
         message.chat.id,
-        f"📝 **Kino #{admin_states[user_id]['queue_num']}** (*{title}*) uchun tavsif kiriting:\n"
+        f"📝 **Kino #{admin_states[user_id]['queue_num']}** (*{title}*) uchun tavsif kiriting:{cap_suggestion}\n"
         f"*(Tavsifsiz qoldirish uchun `-` belgisini yuboring)*",
         reply_markup=markup,
         parse_mode="Markdown"
     )
     bot.register_next_step_handler(msg, process_batch_movie_caption)
+
 
 def process_batch_movie_caption(message):
     user_id = message.from_user.id
@@ -1212,15 +1183,22 @@ def process_batch_movie_caption(message):
         admin_states.pop(user_id, None)
         return
 
-    caption = message.text.strip() if message.text else ""
-    if caption == '-':
+    raw_input = message.text.strip() if message.text else ""
+    def_cap = admin_states.get(user_id, {}).get('default_caption', '')
+
+    if raw_input == '+' and def_cap:
+        caption = def_cap
+    elif raw_input == '-':
         caption = ""
+    else:
+        caption = raw_input
 
     if user_id not in admin_states:
         bot.send_message(message.chat.id, "Jarayon to'xtatilgan.", reply_markup=get_admin_keyboard(user_id))
         return
 
     admin_states[user_id]['caption'] = caption
+
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     btns = [types.InlineKeyboardButton(text=g, callback_data=f"select_batch_genre:{g}") for g in GENRES]

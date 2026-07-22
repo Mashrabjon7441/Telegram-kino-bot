@@ -144,10 +144,13 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             queue_num INTEGER NOT NULL,
             file_id TEXT NOT NULL,
+            title TEXT DEFAULT '',
+            caption TEXT DEFAULT '',
             status TEXT DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
     conn.commit()
     conn.close()
 
@@ -626,12 +629,15 @@ def trigger_auto_backup(bot_instance):
 
 # ----------------- PENDING QUEUE HELPERS -----------------
 
-def add_to_pending_queue(file_id):
+def add_to_pending_queue(file_id, title="", caption=""):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT COALESCE(MAX(queue_num), 0) + 1 FROM pending_queue")
     next_num = cursor.fetchone()[0]
-    cursor.execute("INSERT INTO pending_queue (queue_num, file_id, status) VALUES (?, ?, 'pending')", (next_num, file_id))
+    cursor.execute(
+        "INSERT INTO pending_queue (queue_num, file_id, title, caption, status) VALUES (?, ?, ?, ?, 'pending')",
+        (next_num, file_id, title, caption)
+    )
     conn.commit()
     conn.close()
     return next_num
@@ -647,10 +653,11 @@ def get_pending_queue_count():
 def get_next_pending_video():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, queue_num, file_id FROM pending_queue WHERE status = 'pending' ORDER BY queue_num ASC LIMIT 1")
+    cursor.execute("SELECT id, queue_num, file_id, title, caption FROM pending_queue WHERE status = 'pending' ORDER BY queue_num ASC LIMIT 1")
     res = cursor.fetchone()
     conn.close()
     return res
+
 
 def mark_pending_fulfilled(pending_id):
     conn = sqlite3.connect(DB_NAME)
