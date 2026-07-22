@@ -595,3 +595,17 @@ def get_random_movie():
     conn.close()
     return res
 
+def get_db_path():
+    return DB_NAME
+
+def restore_db_from_bytes(data):
+    try:
+        with open(DB_NAME, 'wb') as f:
+            f.write(data)
+        init_db()
+        return True
+    except Exception as e:
+        print(f"Error restoring DB: {e}")
+        return False
+
+

@@ -81,6 +81,7 @@ def get_admin_keyboard(user_id):
     btn_auto_post = types.KeyboardButton("📢 1-Click Kanalga Joylash")
     btn_vip_mgmt = types.KeyboardButton("🔒 VIP Kinolarni Boshqarish")
     btn_prem_mgmt = types.KeyboardButton("👑 Premium Boshqaruvi")
+    btn_backup = types.KeyboardButton("📦 Bazani Zaxiralash (Backup)")
     btn_back = types.KeyboardButton("⬅️ Bosh sahifa")
     
     keyboard.row(btn_add, btn_del)
@@ -88,7 +89,7 @@ def get_admin_keyboard(user_id):
     keyboard.row(btn_channels, btn_source_ch)
     keyboard.row(btn_adv, btn_post_gen)
     keyboard.row(btn_auto_post, btn_vip_mgmt)
-    keyboard.row(btn_prem_mgmt)
+    keyboard.row(btn_prem_mgmt, btn_backup)
     
     if is_super_admin(user_id):
         btn_promo = types.KeyboardButton("🔑 Admin kodi yaratish")
@@ -96,6 +97,7 @@ def get_admin_keyboard(user_id):
         
     keyboard.row(btn_back)
     return keyboard
+
 
 
 def get_channels_keyboard():
@@ -527,7 +529,23 @@ def callback_handler(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, "Reklama yuborish bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
 
+    elif call.data == "db_backup_now":
+        bot.answer_callback_query(call.id, "Baza zaxiralanmoqda...")
+        db_path = database.get_db_path()
+        try:
+            with open(db_path, 'rb') as doc:
+                bot.send_document(call.message.chat.id, doc, caption="#DB_BACKUP 📦 Ma'lumotlar bazasi (movies.db) zaxira nusxasi")
+            bot.send_message(call.message.chat.id, "✅ **Baza muvaffaqiyatli Telegramga zaxiralandi!**", parse_mode="Markdown")
+        except Exception as e:
+            bot.send_message(call.message.chat.id, f"❌ Zaxiralashda xatolik: {e}")
+
+    elif call.data == "db_restore_prompt":
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(call.message.chat.id, "📥 **Iltimos, zaxiradagi `movies.db` faylini ushbu xabarga yuboring:**", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_db_restore_file)
+
     elif call.data.startswith("fill_video:"):
+
         video_key = call.data.split(":", 1)[1]
         file_id = pending_channel_videos.get(video_key)
         if not file_id:
@@ -933,7 +951,25 @@ def text_handler(message):
         bot.register_next_step_handler(msg, process_set_source_channel)
         return
 
+    elif (text == "📦 Bazani Zaxiralash (Backup)" or text == "📦 Bazani Zaxiralash") and is_admin(user_id):
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(
+            types.InlineKeyboardButton(text="📤 Bazani Telegramga Saqlash (Backup)", callback_data="db_backup_now"),
+            types.InlineKeyboardButton(text="📥 Bazani Tiklash (Restore)", callback_data="db_restore_prompt")
+        )
+        bot.send_message(
+            message.chat.id,
+            "📦 **MA'LUMOTLAR BAZASI (SQLITE) BOSHQARUVI:**\n\n"
+            "• Server xotirasida faqat matnlar va kodlar saqlanadi (baza hajmi 1 MB dan ham kam!).\n"
+            "• Videolar Telegram serverlarida bepul saqlanadi va serverda joy egallamaydi!\n\n"
+            "Server reboot bo'lganida ma'lumotlarni yo'qotmaslik uchun zaxira (backup) oling yoki tiklang:",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+        return
+
     elif text == "⬅️ Admin panelga qaytish" and is_admin(user_id):
+
 
         bot.send_message(message.chat.id, "Admin panelga qaytdingiz:", reply_markup=get_admin_keyboard(user_id))
         return
@@ -1088,6 +1124,24 @@ def process_toggle_vip_movie(message):
         bot.send_message(message.chat.id, f"✅ `{code}` kodli kino statusi o'zgartirildi: {status_str}", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
     else:
         bot.send_message(message.chat.id, f"❌ `{code}` kodli kino topilmadi.", reply_markup=get_admin_keyboard(user_id))
+
+def process_db_restore_file(message):
+    user_id = message.from_user.id
+    if not message.document:
+        bot.send_message(message.chat.id, "Xato: `.db` fayli yuborilmadi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    try:
+        file_info = bot.get_file(message.document.file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+        success = database.restore_db_from_bytes(downloaded_file)
+        if success:
+            bot.send_message(message.chat.id, "🎉 **Ma'lumotlar bazasi muvaffaqiyatli tiklandi!** Barcha kinolar va kodlar qaytdi.", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+        else:
+            bot.send_message(message.chat.id, "❌ Bazani tiklashda xatolik yuz berdi.", reply_markup=get_admin_keyboard(user_id))
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Xatolik: {e}", reply_markup=get_admin_keyboard(user_id))
+
 
 def process_set_source_channel(message):
     user_id = message.from_user.id
