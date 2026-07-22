@@ -52,8 +52,23 @@ def init_db():
             invite_link TEXT NOT NULL
         )
     """)
+    # Create admins table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS admins (
+            user_id INTEGER PRIMARY KEY,
+            added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # Create settings table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
     conn.commit()
     conn.close()
+
 
 def add_user(user_id, username):
     conn = sqlite3.connect(DB_NAME)
@@ -197,4 +212,35 @@ def get_users():
     res = cursor.fetchall()
     conn.close()
     return [row[0] for row in res]
+
+def set_setting(key, value):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key.strip(), value.strip()))
+    conn.commit()
+    conn.close()
+
+def get_setting(key, default=None):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM settings WHERE key = ?", (key.strip(),))
+    res = cursor.fetchone()
+    conn.close()
+    return res[0] if res else default
+
+def add_db_admin(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR IGNORE INTO admins (user_id) VALUES (?)", (user_id,))
+    conn.commit()
+    conn.close()
+
+def is_db_admin(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM admins WHERE user_id = ?", (user_id,))
+    res = cursor.fetchone()
+    conn.close()
+    return res is not None
+
 

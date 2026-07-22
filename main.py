@@ -20,7 +20,9 @@ bot = telebot.TeleBot(config.BOT_TOKEN)
 admin_states = {}
 
 def is_admin(user_id):
-    return user_id in config.ADMIN_IDS
+    if user_id in config.ADMIN_IDS:
+        return True
+    return database.is_db_admin(user_id)
 
 # Helper to generate unique random code
 def generate_unique_code():
@@ -48,12 +50,15 @@ def get_admin_keyboard():
     btn_stats = types.KeyboardButton("📊 Statistika")
     btn_channels = types.KeyboardButton("📢 Homiylar / Kanallar")
     btn_adv = types.KeyboardButton("✉️ Reklama yuborish")
+    btn_promo = types.KeyboardButton("🔑 Admin kodi yaratish")
     btn_back = types.KeyboardButton("⬅️ Bosh sahifa")
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
     keyboard.row(btn_channels, btn_adv)
+    keyboard.row(btn_promo)
     keyboard.row(btn_back)
     return keyboard
+
 
 def get_channels_keyboard():
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -307,6 +312,33 @@ def text_handler(message):
         bot.register_next_step_handler(msg, process_adv_message)
         return
 
+    # Admin promo code setting handler
+    elif text == "🔑 Admin kodi yaratish" and is_admin(user_id):
+        current_promo = database.get_setting('admin_promo_code', 'Mavjud emas')
+        msg = bot.send_message(
+            message.chat.id,
+            f"🔑 **Hozirgi Admin kodi:** `{current_promo}`\n\n"
+            "Yangi adminlik beruvchi parolni (kodni) kiriting (Masalan: `secret777`):\n"
+            "*(Ushbu kodni kiritgan har qanday foydalanuvchi botga avtomatik admin bo'ladi)*\n\n"
+            "Bekor qilish uchun 'bekor' deb yozing.",
+            parse_mode="Markdown"
+        )
+        bot.register_next_step_handler(msg, process_set_admin_promo_code)
+        return
+
+    # Check if text matches active admin promo code
+    active_promo = database.get_setting('admin_promo_code')
+    if active_promo and text.strip() == active_promo:
+        database.add_db_admin(user_id)
+        bot.send_message(
+            message.chat.id,
+            "🎉 **Tabriklaymiz!** Siz to'g'ri maxsus admin kodini kiritdingiz.\n\n"
+            "Sizga botda **ADMIN** huquqi berildi! ⚙️",
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard(user_id)
+        )
+        return
+
     # User search movie by code
     code = text.strip()
     movie = database.get_movie(code)
@@ -331,6 +363,24 @@ def text_handler(message):
         bot.send_message(message.chat.id, caption_full, reply_markup=markup, parse_mode="Markdown")
     else:
         bot.send_message(message.chat.id, "❌ Bunday kodli kino topilmadi. Kodni tekshirib qaytadan kiritib ko'ring.")
+
+# ----------------- ADMIN PROMO CODE WORKFLOW -----------------
+
+def process_set_admin_promo_code(message):
+    code = message.text.strip() if message.text else ""
+    if not code or code.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard())
+        return
+        
+    database.set_setting('admin_promo_code', code)
+    bot.send_message(
+        message.chat.id,
+        f"✅ **Yangi Admin kodi saqlandi!**\n\n🔑 Parol: `{code}`\n\n"
+        "Endi kim ushbu kodni botga yuborsa, u avtomatik tarzda Admin huquqini oladi.",
+        parse_mode="Markdown",
+        reply_markup=get_admin_keyboard()
+    )
+
 
 # ----------------- ADD MOVIE WORKFLOW -----------------
 
