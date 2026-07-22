@@ -43,10 +43,13 @@ def get_main_keyboard(user_id):
     btn_top = types.KeyboardButton("🔥 Top 10 kinolar")
     btn_fav = types.KeyboardButton("❤️ Sevimlilarim")
     btn_ref = types.KeyboardButton("👥 Do'stlarni taklif qilish")
+    btn_prem = types.KeyboardButton("👑 Premium A'zolik")
+    btn_supp = types.KeyboardButton("✍️ Adminga Murojaat")
     
     keyboard.row(btn_search, btn_genres)
     keyboard.row(btn_top, btn_fav)
-    keyboard.row(btn_ref)
+    keyboard.row(btn_ref, btn_prem)
+    keyboard.row(btn_supp)
     
     if is_admin(user_id):
         btn_admin = types.KeyboardButton("⚙️ Admin panel")
@@ -62,12 +65,15 @@ def get_admin_keyboard(user_id):
     btn_channels = types.KeyboardButton("📢 Homiylar / Kanallar")
     btn_adv = types.KeyboardButton("✉️ Reklama yuborish")
     btn_post_gen = types.KeyboardButton("📢 Post Generator")
+    btn_vip_mgmt = types.KeyboardButton("🔒 VIP Kinolarni Boshqarish")
+    btn_prem_mgmt = types.KeyboardButton("👑 Premium Boshqaruvi")
     btn_back = types.KeyboardButton("⬅️ Bosh sahifa")
     
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
     keyboard.row(btn_channels, btn_adv)
-    keyboard.row(btn_post_gen)
+    keyboard.row(btn_post_gen, btn_vip_mgmt)
+    keyboard.row(btn_prem_mgmt)
     
     if is_super_admin(user_id):
         btn_promo = types.KeyboardButton("🔑 Admin kodi yaratish")
@@ -87,7 +93,8 @@ def get_channels_keyboard():
     return keyboard
 
 def get_unsubscribed_channels(user_id):
-    if is_admin(user_id):
+    # Premium users and admins bypass mandatory channel checks!
+    if is_admin(user_id) or database.is_premium_user(user_id):
         return []
     
     channels = database.get_channels()
@@ -114,7 +121,7 @@ def check_must_join(message):
         
         bot.send_message(
             message.chat.id,
-            "⚠️ **Botdan foydalanish uchun quyidagi homiy kanallariga a'zo bo'lishingiz zarur:**\n\nA'zo bo'lgach, *Tasdiqlash* tugmasini bosing.",
+            "⚠️ **Botdan foydalanish uchun quyidagi homiy kanallariga a'zo bo'lishingiz zarur:**\n\n*(Eslatma: 👑 Premium a'zolar majburiy a'zolikdan ozod qilinadi)*\n\nA'zo bo'lgach, *Tasdiqlash* tugmasini bosing.",
             reply_markup=markup,
             parse_mode="Markdown"
         )
@@ -128,16 +135,34 @@ def send_movie_card(chat_id, code, user_id):
         bot.send_message(chat_id, "❌ Bunday kodli kino topilmadi.")
         return
 
-    code, title, caption, genre, views = movie
+    code, title, caption, genre, views, is_vip = movie
+
+    # VIP Protection Check
+    if is_vip and not database.is_premium_user(user_id) and not is_admin(user_id):
+        vip_text = (
+            f"🔒 **Ushbu kino faqat 👑 Premium foydalanuvchilar uchun!**\n\n"
+            f"🎬 **Kino:** {title}\n"
+            f"🔑 **Kodi:** `{code}`\n\n"
+            f"💡 **Premium a'zolikni olish yo'llari:**\n"
+            f"1. **5 ta do'stingizni** taklif qiling va **AVTOMATIK 1 oylik Tekin Premium** oling!\n"
+            f"2. Adminga murojaat qiling."
+        )
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(text="👥 Do'stlarni taklif qilish", callback_data="open_ref"))
+        markup.add(types.InlineKeyboardButton(text="✍️ Adminga murojaat qilish", callback_data="open_support"))
+        bot.send_message(chat_id, vip_text, reply_markup=markup, parse_mode="Markdown")
+        return
+
     database.increment_movie_views(code)
     likes, dislikes = database.get_movie_ratings(code)
     episodes = database.get_episodes(code)
     is_fav = database.is_favorite(user_id, code)
 
     fav_text = "💔 Sevimlilardan chiqarish" if is_fav else "❤️ Sevimlilarga qo'shish"
+    vip_badge = " 🔒 [VIP]" if is_vip else ""
 
     text = (
-        f"🎬 **Kino nomi:** {title}\n"
+        f"🎬 **Kino nomi:** {title}{vip_badge}\n"
         f"🎭 **Janr:** {genre}\n"
         f"🔑 **Kodi:** `{code}`\n"
         f"👁 **Ko'rishlar:** {views + 1} ta\n"
@@ -189,15 +214,27 @@ def start_cmd(message):
 
     database.add_user(user_id, username, referred_by)
 
-    # If new referral
+    # Referral reward logic: 5 referrals = 30 days FREE Premium!
     if referred_by and referred_by != user_id:
         added = database.add_referral(referred_by, user_id)
         if added:
+            ref_count = database.get_user_referral_count(referred_by)
             try:
-                ref_count = database.get_user_referral_count(referred_by)
-                bot.send_message(referred_by, f"🎉 Sizning havolangiz orqali yangi foydalanuvchi botga kirdi!\nJami taklif qilgan do'stlaringiz: {ref_count} ta")
+                bot.send_message(referred_by, f"🎉 Sizning havolangiz orqali yangi foydalanuvchi botga kirdi!\nJami taklif qilgan do'stlaringiz: **{ref_count}** ta", parse_mode="Markdown")
             except Exception:
                 pass
+
+            if ref_count > 0 and ref_count % 5 == 0:
+                database.add_premium(referred_by, days=30)
+                try:
+                    bot.send_message(
+                        referred_by,
+                        "🎉 **TABRIKLAYMIZ!** Siz 5 ta do'stingizni taklif qilganingiz uchun sizga **1 oylik TEKIN 👑 Premium A'zolik** berildi!\n\n"
+                        "Endi siz majburiy a'zolik kanallarisiz hamda VIP kinolarni cheklovlarsiz ko'ra olasiz!",
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
 
     if not is_admin(user_id):
         if not check_must_join(message):
@@ -208,8 +245,11 @@ def start_cmd(message):
         send_movie_card(message.chat.id, direct_movie_code, user_id)
         return
 
+    prem_info = database.get_premium_info(user_id)
+    badge = " 👑 [PREMIUM]" if prem_info else ""
+
     welcome_text = (
-        f"Assalomu alaykum, {message.from_user.first_name}!\n\n"
+        f"Assalomu alaykum, {message.from_user.first_name}{badge}!\n\n"
         "🎬 **Kinolarni kod yoki nomi orqali ko'rish botiga xush kelibsiz!**\n"
         "Kino ko'rish uchun uning kodini yoki nomini yuboring (Masalan: `1230` yoki `Avatar`)."
     )
@@ -237,13 +277,30 @@ def callback_handler(call):
             )
             bot.send_message(call.message.chat.id, welcome_text, reply_markup=get_main_keyboard(user_id), parse_mode="Markdown")
 
+    elif call.data == "open_ref":
+        bot.answer_callback_query(call.id)
+        bot_username = bot.get_me().username
+        ref_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+        ref_count = database.get_user_referral_count(user_id)
+        msg_text = (
+            f"👥 **Do'stlarni taklif qiling va Tekin Premium oling!**\n\n"
+            f"Sizning taklif havolangiz:\n`{ref_link}`\n\n"
+            f"📊 Taklif qilgan do'stlaringiz: **{ref_count}** ta\n"
+            f"💡 **Har 5 ta do'st uchun 1 oylik Tekin Premium beriladi!**"
+        )
+        bot.send_message(call.message.chat.id, msg_text, parse_mode="Markdown")
+
+    elif call.data == "open_support":
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(call.message.chat.id, "✍️ Adminga yubormoqchi bo'lgan murojaatingiz yoki savolingizni yozib yuboring:")
+        bot.register_next_step_handler(msg, process_user_support_message)
+
     elif call.data.startswith("fav_toggle:"):
         code = call.data.split(":")[1]
         added = database.toggle_favorite(user_id, code)
         msg = "❤️ Sevimlilarga qo'shildi!" if added else "💔 Sevimlilardan chiqarildi!"
         bot.answer_callback_query(call.id, msg, show_alert=True)
         
-        # Refresh movie card if possible
         try:
             is_fav = database.is_favorite(user_id, code)
             fav_text = "💔 Sevimlilardan chiqarish" if is_fav else "❤️ Sevimlilarga qo'shish"
@@ -273,6 +330,11 @@ def callback_handler(call):
             file_id, episode_title, movie_code = episode
             movie = database.get_movie(movie_code)
             movie_title = movie[1] if movie else ""
+            is_vip = movie[5] if movie else 0
+
+            if is_vip and not database.is_premium_user(user_id) and not is_admin(user_id):
+                bot.answer_callback_query(call.id, "🔒 Ushbu qism faqat Premium a'zolar uchun!", show_alert=True)
+                return
 
             bot.answer_callback_query(call.id, f"Yuklanmoqda: {episode_title}")
             bot.send_chat_action(call.message.chat.id, 'upload_video')
@@ -297,8 +359,9 @@ def callback_handler(call):
 
         bot.answer_callback_query(call.id)
         markup = types.InlineKeyboardMarkup(row_width=1)
-        for code, title, views in movies:
-            markup.add(types.InlineKeyboardButton(text=f"🎬 {title} (🔑 {code})", callback_data=f"show_movie:{code}"))
+        for code, title, views, is_vip in movies:
+            vip_mark = " 🔒" if is_vip else ""
+            markup.add(types.InlineKeyboardButton(text=f"🎬 {title}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
 
         bot.send_message(call.message.chat.id, f"📂 **{genre_name}** janridagi kinolar ro'yxati:", reply_markup=markup, parse_mode="Markdown")
 
@@ -390,10 +453,11 @@ def inline_query_handler(query):
     bot_info = bot.get_me()
     bot_username = bot_info.username
 
-    for i, (code, title, genre, views) in enumerate(movies):
-        description = f"Janr: {genre} | Ko'rishlar: {views} ta | Kod: {code}"
+    for i, (code, title, genre, views, is_vip) in enumerate(movies):
+        vip_mark = " 🔒 [VIP]" if is_vip else ""
+        description = f"Janr: {genre} | Ko'rishlar: {views} ta | Kod: {code}{vip_mark}"
         content = types.InputTextMessageContent(
-            f"🎬 **{title}**\n🎭 Janr: {genre}\n🔑 Kodi: `{code}`\n\n👇 Tomosha qilish uchun botga bosing:\nhttps://t.me/{bot_username}?start={code}",
+            f"🎬 **{title}**{vip_mark}\n🎭 Janr: {genre}\n🔑 Kodi: `{code}`\n\n👇 Tomosha qilish uchun botga bosing:\nhttps://t.me/{bot_username}?start={code}",
             parse_mode="Markdown"
         )
         markup = types.InlineKeyboardMarkup()
@@ -401,7 +465,7 @@ def inline_query_handler(query):
 
         result = types.InlineQueryResultArticle(
             id=str(i),
-            title=f"🎬 {title} (Kod: {code})",
+            title=f"🎬 {title} (Kod: {code}){vip_mark}",
             input_message_content=content,
             reply_markup=markup,
             description=description
@@ -414,7 +478,21 @@ def inline_query_handler(query):
 @bot.message_handler(func=lambda msg: True)
 def text_handler(message):
     user_id = message.from_user.id
-    text = message.text.strip()
+    text = message.text.strip() if message.text else ""
+
+    # Support Message Reply by Admin
+    if message.reply_to_message and is_admin(user_id):
+        orig_msg = message.reply_to_message
+        ticket = database.get_support_ticket_by_msg(orig_msg.message_id)
+        if ticket:
+            _, target_user_id, orig_user_text = ticket
+            try:
+                bot.send_message(target_user_id, f"💬 **Admin javobi:**\n\n{text}", parse_mode="Markdown")
+                bot.send_message(message.chat.id, f"✅ Javob foydalanuvchiga (`{target_user_id}`) muvaffaqiyatli yetkazildi!", parse_mode="Markdown")
+                return
+            except Exception as e:
+                bot.send_message(message.chat.id, f"❌ Javob yuborishda xatolik: {e}")
+                return
 
     # Check joining first
     if not is_admin(user_id):
@@ -441,9 +519,10 @@ def text_handler(message):
 
         text_response = "🔥 **Eng ko'p ko'rilgan TOP 10 kinolar:**\n\n"
         markup = types.InlineKeyboardMarkup(row_width=1)
-        for idx, (code, title, views, genre) in enumerate(top_movies, 1):
-            text_response += f"{idx}. 🎬 **{title}** — 👁 `{views}` marta (Kod: `{code}`)\n"
-            markup.add(types.InlineKeyboardButton(text=f"{idx}. 🎬 {title} (🔑 {code})", callback_data=f"show_movie:{code}"))
+        for idx, (code, title, views, genre, is_vip) in enumerate(top_movies, 1):
+            vip_mark = " 🔒" if is_vip else ""
+            text_response += f"{idx}. 🎬 **{title}**{vip_mark} — 👁 `{views}` marta (Kod: `{code}`)\n"
+            markup.add(types.InlineKeyboardButton(text=f"{idx}. 🎬 {title}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
 
         bot.send_message(message.chat.id, text_response, reply_markup=markup, parse_mode="Markdown")
         return
@@ -469,14 +548,43 @@ def text_handler(message):
         ref_count = database.get_user_referral_count(user_id)
 
         msg_text = (
-            f"👥 **Do'stlarni taklif qilish va ulashish**\n\n"
+            f"👥 **Do'stlarni taklif qiling va TEKIN 👑 Premium oling!**\n\n"
             f"Sizning taklif havolangiz:\n`{ref_link}`\n\n"
             f"📊 Siz taklif qilgan do'stlar soni: **{ref_count}** ta\n\n"
-            f"Ushbu havolani do'stlaringizga ulashing!"
+            f"🎁 **Aksiya:** Har 5 ta do'stingiz uchun sizga **1 oylik TEKIN Premium** beriladi!"
         )
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton(text="📢 Do'stlarga ulashish", url=f"https://t.me/share/url?url={ref_link}&text=🎬 Kinolarni kod orqali ko'rish botiga kirish!"))
         bot.send_message(message.chat.id, msg_text, reply_markup=markup, parse_mode="Markdown")
+        return
+
+    elif text == "👑 Premium A'zolik":
+        prem_info = database.get_premium_info(user_id)
+        if prem_info:
+            status_str = f"✅ **FAOL** 👑\n📅 Muddati: **{prem_info}**"
+        else:
+            status_str = "🆓 **Oddiy (FREE)**"
+
+        msg_text = (
+            f"👑 **Premium A'zolik Statusi:**\n\n"
+            f"{status_str}\n\n"
+            f"🌟 **Premium Imtiyozlari:**\n"
+            f"• 🚫 Majburiy kanallardan to'liq ozod bo'lish\n"
+            f"• 🔒 VIP Kinolarni cheklovlarsiz tomosha qilish\n"
+            f"• 👑 Profilizda oltin toj va VIP maqom\n\n"
+            f"💡 **Premium olish yo'li:**\n"
+            f"1. **5 ta do'stingizni** taklif qiling (Referal orqali tekin 1 oy oling).\n"
+            f"2. Adminga murojaat qiling."
+        )
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(text="👥 Do'stlarni taklif qilish", callback_data="open_ref"))
+        markup.add(types.InlineKeyboardButton(text="✍️ Adminga murojaat qilish", callback_data="open_support"))
+        bot.send_message(message.chat.id, msg_text, reply_markup=markup, parse_mode="Markdown")
+        return
+
+    elif text == "✍️ Adminga Murojaat":
+        msg = bot.send_message(message.chat.id, "✍️ Adminga yubormoqchi bo'lgan murojaatingiz yoki savolingizni yozib yuboring (Text, rasm yoki audio):")
+        bot.register_next_step_handler(msg, process_user_support_message)
         return
 
     elif text == "⚙️ Admin panel" and is_admin(user_id):
@@ -508,27 +616,48 @@ def text_handler(message):
             bot.send_message(message.chat.id, "Hozircha ma'lumotlar bazasida kinolar yo'q.")
             return
 
-        response = "📋 **Kinolar ro'yxati (kod - nomi - janr - ko'rishlar):**\n\n"
-        for code, title, genre, views in movies:
-            response += f"🔑 `{code}` - **{title}** ({genre}) | 👁 {views} ta\n"
+        response = "📋 **Kinolar ro'yxati (kod - nomi - janr - ko'rishlar - VIP):**\n\n"
+        for code, title, genre, views, is_vip in movies:
+            vip_mark = " 🔒 [VIP]" if is_vip else ""
+            response += f"🔑 `{code}` - **{title}**{vip_mark} ({genre}) | 👁 {views} ta\n"
         bot.send_message(message.chat.id, response, parse_mode="Markdown")
         return
 
     elif text == "📊 Statistika" and is_admin(user_id):
         user_count = database.get_users_count()
+        prem_count = database.get_premium_count()
         movies_count = len(database.get_all_movies())
         top_movies = database.get_top_movies(5)
 
         stat_text = (
             f"📊 **Bot kengaytirilgan statistikasi:**\n\n"
             f"👥 Jami foydalanuvchilar: **{user_count}** ta\n"
+            f"👑 Premium a'zolar: **{prem_count}** ta\n"
             f"🎬 Jami yuklangan kinolar: **{movies_count}** ta\n\n"
             f"🔥 **Eng ommabop 5 ta kino:**\n"
         )
-        for i, (c, t, v, g) in enumerate(top_movies, 1):
+        for i, (c, t, v, g, is_v) in enumerate(top_movies, 1):
             stat_text += f"{i}. {t} — 👁 `{v}` ko'rishlar\n"
 
         bot.send_message(message.chat.id, stat_text, parse_mode="Markdown")
+        return
+
+    elif text == "🔒 VIP Kinolarni Boshqarish" and is_admin(user_id):
+        msg = bot.send_message(message.chat.id, "VIP statusini o'gartirmoqchi bo'lgan kino kodini kiriting (Masalan: 1230):")
+        bot.register_next_step_handler(msg, process_toggle_vip_movie)
+        return
+
+    elif text == "👑 Premium Boshqaruvi" and is_admin(user_id):
+        msg_text = (
+            f"👑 **Premium Boshqaruvi:**\n\n"
+            f"Foydalanuvchiga Premium berish yoki olib tashlash uchun buyruq yoki ID yuboring:\n\n"
+            f"• Premium berish: `+ID 30` (Masalan: `+79012345 30`)\n"
+            f"• Umrbod Premium berish: `+ID lifetime`\n"
+            f"• Premium olib tashlash: `-ID` (Masalan: `-79012345`)\n\n"
+            f"Bekor qilish uchun 'bekor' deb yozing."
+        )
+        msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_admin_premium_command)
         return
 
     elif text == "📢 Post Generator" and is_admin(user_id):
@@ -566,8 +695,8 @@ def text_handler(message):
         bot.send_message(message.chat.id, response, parse_mode="Markdown", disable_web_page_preview=True)
         return
 
-    elif text == "✉️ Reklama yuborish" and is_admin(user_id):
-        msg = bot.send_message(message.chat.id, "Foydalanuvchilarga yubormoqchi bo'lgan reklama xabarini yuboring:\n\nBekor qilish uchun 'bekor' deb yozing.")
+    elif (text == "✉️ Reklama yuborish" or text == "📢 Hammaga Xabar Yuborish") and is_admin(user_id):
+        msg = bot.send_message(message.chat.id, "Foydalanuvchilarga yubormoqchi bo'lgan reklama xabarini yuboring (Matn, rasm, video, audio yoki ixtiyoriy format):\n\nBekor qilish uchun 'bekor' deb yozing.")
         bot.register_next_step_handler(msg, process_adv_message)
         return
 
@@ -608,12 +737,92 @@ def text_handler(message):
     matches = database.search_movies_by_name(text)
     if matches:
         markup = types.InlineKeyboardMarkup(row_width=1)
-        for code, title, genre, views in matches:
-            markup.add(types.InlineKeyboardButton(text=f"🎬 {title} (🔑 {code})", callback_data=f"show_movie:{code}"))
+        for code, title, genre, views, is_vip in matches:
+            vip_mark = " 🔒" if is_vip else ""
+            markup.add(types.InlineKeyboardButton(text=f"🎬 {title}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
 
         bot.send_message(message.chat.id, f"🔍 **'{text}' bo'yicha topilgan kinolar:**", reply_markup=markup, parse_mode="Markdown")
     else:
         bot.send_message(message.chat.id, "❌ Bunday kodli yoki nomli kino topilmadi. Kodni yoki nomini tekshirib qaytadan kiritib ko'ring.")
+
+# ----------------- SUPPORT & PREMIUM WORKFLOWS -----------------
+
+def process_user_support_message(message):
+    user_id = message.from_user.id
+    if message.text and message.text.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Murojaat bekor qilindi.", reply_markup=get_main_keyboard(user_id))
+        return
+
+    # Forward support message to all Admins
+    user_info = f"👤 Foydalanuvchi: {message.from_user.first_name} (@{message.from_user.username or 'mavjud_emas'})\nID: `{user_id}`"
+    admin_notice = f"📩 **YANGI MUROJAAT:**\n\n{user_info}\n\n👇 **Javob berish uchun ushbu xabarga Reply (Javob) qiling:**"
+
+    for admin_id in config.ADMIN_IDS:
+        try:
+            sent_msg = bot.send_message(admin_id, admin_notice, parse_mode="Markdown")
+            fwd_msg = bot.copy_message(admin_id, message.chat.id, message.message_id)
+            database.add_support_ticket(user_id, fwd_msg.message_id, message.text or "[Fayl/Media]")
+        except Exception as e:
+            print(f"Failed sending support msg to admin {admin_id}: {e}")
+
+    bot.send_message(message.chat.id, "✅ Murojaatingiz adminga yetkazildi! Admin javob bersa, sizga xabar keladi.", reply_markup=get_main_keyboard(user_id))
+
+def process_admin_premium_command(message):
+    user_id = message.from_user.id
+    text = message.text.strip() if message.text else ""
+
+    if not text or text.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    parts = text.split()
+    cmd = parts[0]
+
+    try:
+        if cmd.startswith("+"):
+            target_id = int(cmd.replace("+", ""))
+            days = 30
+            is_lifetime = False
+
+            if len(parts) > 1:
+                if parts[1].lower() == 'lifetime':
+                    is_lifetime = True
+                elif parts[1].isdigit():
+                    days = int(parts[1])
+
+            database.add_premium(target_id, days=days, is_lifetime=is_lifetime)
+            duration_str = "Umrbod (Lifetime)" if is_lifetime else f"{days} kunlik"
+            bot.send_message(message.chat.id, f"✅ Foydalanuvchiga (`{target_id}`) **{duration_str} 👑 Premium** muvaffaqiyatli berildi!", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+            try:
+                bot.send_message(target_id, f"🎉 **Sizga Admin tomonidan {duration_str} 👑 Premium A'zolik berildi!**\n\nEndi siz majburiy a'zolik kanallarisiz va VIP kinolarga cheksiz kirish imkoniyatiga egasiz!", parse_mode="Markdown")
+            except Exception:
+                pass
+
+        elif cmd.startswith("-"):
+            target_id = int(cmd.replace("-", ""))
+            deleted = database.remove_premium(target_id)
+            if deleted:
+                bot.send_message(message.chat.id, f"✅ Foydalanuvchidan (`{target_id}`) Premium olib tashlandi.", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+            else:
+                bot.send_message(message.chat.id, f"❌ Foydalanuvchi (`{target_id}`) Premium ro'yxatida topilmadi.", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+        else:
+            bot.send_message(message.chat.id, "Xato format! Namuna: `+79012345 30` yoki `-79012345`", reply_markup=get_admin_keyboard(user_id))
+    except Exception as e:
+        bot.send_message(message.chat.id, f"Xatolik yuz berdi: {e}", reply_markup=get_admin_keyboard(user_id))
+
+def process_toggle_vip_movie(message):
+    user_id = message.from_user.id
+    code = message.text.strip() if message.text else ""
+    if not code or code.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    found, is_vip = database.toggle_movie_vip(code)
+    if found:
+        status_str = "🔒 **VIP (Faqat Premium)**" if is_vip else "🌐 **Oddiy (Barchaga ochiq)**"
+        bot.send_message(message.chat.id, f"✅ `{code}` kodli kino statusi o'zgartirildi: {status_str}", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+    else:
+        bot.send_message(message.chat.id, f"❌ `{code}` kodli kino topilmadi.", reply_markup=get_admin_keyboard(user_id))
 
 # ----------------- ADMIN WORKFLOWS -----------------
 
@@ -642,12 +851,13 @@ def process_channel_post_generator(message):
         bot.send_message(message.chat.id, f"❌ `{code}` kodli kino topilmadi.", reply_markup=get_admin_keyboard(user_id))
         return
 
-    code, title, caption, genre, views = movie
+    code, title, caption, genre, views, is_vip = movie
     bot_username = bot.get_me().username
     bot_link = f"https://t.me/{bot_username}?start={code}"
+    vip_badge = " 🔒 [VIP]" if is_vip else ""
 
     post_text = (
-        f"🎬 **{title}**\n\n"
+        f"🎬 **{title}**{vip_badge}\n\n"
         f"🎭 **Janr:** {genre}\n"
         f"🔑 **Kino kodi:** `{code}`\n\n"
     )

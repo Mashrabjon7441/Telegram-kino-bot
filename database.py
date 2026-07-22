@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from datetime import datetime, timedelta
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_NAME = os.path.join(BASE_DIR, "movies.db")
@@ -22,7 +23,8 @@ def init_db():
             title TEXT NOT NULL,
             caption TEXT,
             genre TEXT DEFAULT 'Umumiy',
-            views INTEGER DEFAULT 0
+            views INTEGER DEFAULT 0,
+            is_vip INTEGER DEFAULT 0
         )
     """)
     
@@ -33,6 +35,8 @@ def init_db():
         cursor.execute("ALTER TABLE movies ADD COLUMN genre TEXT DEFAULT 'Umumiy'")
     if 'views' not in columns:
         cursor.execute("ALTER TABLE movies ADD COLUMN views INTEGER DEFAULT 0")
+    if 'is_vip' not in columns:
+        cursor.execute("ALTER TABLE movies ADD COLUMN is_vip INTEGER DEFAULT 0")
 
     # Create episodes table
     cursor.execute("""
@@ -107,6 +111,25 @@ def init_db():
             referred_id INTEGER PRIMARY KEY
         )
     """)
+    # Create premium_users table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS premium_users (
+            user_id INTEGER PRIMARY KEY,
+            expire_date TIMESTAMP,
+            is_lifetime INTEGER DEFAULT 0
+        )
+    """)
+    # Create support_tickets table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS support_tickets (
+            ticket_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            message_id INTEGER NOT NULL,
+            user_text TEXT,
+            status TEXT DEFAULT 'open',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -126,14 +149,14 @@ def get_users_count():
     conn.close()
     return count
 
-def add_movie(code, title, caption, genre='Umumiy'):
+def add_movie(code, title, caption, genre='Umumiy', is_vip=0):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            INSERT OR REPLACE INTO movies (code, title, caption, genre, views)
-            VALUES (?, ?, ?, ?, COALESCE((SELECT views FROM movies WHERE code = ?), 0))
-        """, (code.strip(), title.strip(), caption.strip() if caption else "", genre.strip(), code.strip()))
+            INSERT OR REPLACE INTO movies (code, title, caption, genre, views, is_vip)
+            VALUES (?, ?, ?, ?, COALESCE((SELECT views FROM movies WHERE code = ?), 0), ?)
+        """, (code.strip(), title.strip(), caption.strip() if caption else "", genre.strip(), code.strip(), is_vip))
         conn.commit()
         success = True
     except Exception as e:
@@ -146,16 +169,31 @@ def add_movie(code, title, caption, genre='Umumiy'):
 def get_movie(code):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT code, title, caption, genre, views FROM movies WHERE code = ?", (code.strip(),))
+    cursor.execute("SELECT code, title, caption, genre, views, is_vip FROM movies WHERE code = ?", (code.strip(),))
     res = cursor.fetchone()
     conn.close()
     return res
+
+def toggle_movie_vip(code):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT is_vip FROM movies WHERE code = ?", (code.strip(),))
+    res = cursor.fetchone()
+    if not res:
+        conn.close()
+        return False, False
+    current_vip = res[0] or 0
+    new_vip = 0 if current_vip == 1 else 1
+    cursor.execute("UPDATE movies SET is_vip = ? WHERE code = ?", (new_vip, code.strip()))
+    conn.commit()
+    conn.close()
+    return True, bool(new_vip)
 
 def search_movies_by_name(query):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     search = f"%{query.strip()}%"
-    cursor.execute("SELECT code, title, genre, views FROM movies WHERE title LIKE ? OR caption LIKE ? LIMIT 20", (search, search))
+    cursor.execute("SELECT code, title, genre, views, is_vip FROM movies WHERE title LIKE ? OR caption LIKE ? LIMIT 20", (search, search))
     res = cursor.fetchall()
     conn.close()
     return res
@@ -163,7 +201,7 @@ def search_movies_by_name(query):
 def get_movies_by_genre(genre):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT code, title, views FROM movies WHERE genre = ? ORDER BY id DESC LIMIT 30", (genre.strip(),))
+    cursor.execute("SELECT code, title, views, is_vip FROM movies WHERE genre = ? ORDER BY id DESC LIMIT 30", (genre.strip(),))
     res = cursor.fetchall()
     conn.close()
     return res
@@ -171,7 +209,7 @@ def get_movies_by_genre(genre):
 def get_top_movies(limit=10):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT code, title, views, genre FROM movies ORDER BY views DESC LIMIT ?", (limit,))
+    cursor.execute("SELECT code, title, views, genre, is_vip FROM movies ORDER BY views DESC LIMIT ?", (limit,))
     res = cursor.fetchall()
     conn.close()
     return res
@@ -240,10 +278,89 @@ def delete_episode(episode_id):
 def get_all_movies():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT code, title, genre, views FROM movies ORDER BY id DESC")
+    cursor.execute("SELECT code, title, genre, views, is_vip FROM movies ORDER BY id DESC")
     res = cursor.fetchall()
     conn.close()
     return res
+
+# ----------------- PREMIUM USERS -----------------
+
+def is_premium_user(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT expire_date, is_lifetime FROM premium_users WHERE user_id = ?", (user_id,))
+    res = cursor.fetchone()
+    conn.close()
+    if not res:
+        return False
+    expire_date_str, is_lifetime = res
+    if is_lifetime == 1:
+        return True
+    if expire_date_str:
+        try:
+            expire_date = datetime.strptime(expire_date_str, "%Y-%m-%d %H:%M:%S")
+            return datetime.now() < expire_date
+        except Exception:
+            return False
+    return False
+
+def add_premium(user_id, days=30, is_lifetime=False):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    if is_lifetime:
+        cursor.execute("INSERT OR REPLACE INTO premium_users (user_id, expire_date, is_lifetime) VALUES (?, NULL, 1)", (user_id,))
+    else:
+        now = datetime.now()
+        cursor.execute("SELECT expire_date FROM premium_users WHERE user_id = ? AND is_lifetime = 0", (user_id,))
+        res = cursor.fetchone()
+        if res and res[0]:
+            try:
+                current_expire = datetime.strptime(res[0], "%Y-%m-%d %H:%M:%S")
+                if current_expire > now:
+                    now = current_expire
+            except Exception:
+                pass
+        new_expire = (now + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("INSERT OR REPLACE INTO premium_users (user_id, expire_date, is_lifetime) VALUES (?, ?, 0)", (user_id, new_expire))
+    conn.commit()
+    conn.close()
+
+def remove_premium(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM premium_users WHERE user_id = ?", (user_id,))
+    conn.commit()
+    deleted = cursor.rowcount > 0
+    conn.close()
+    return deleted
+
+def get_premium_info(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT expire_date, is_lifetime FROM premium_users WHERE user_id = ?", (user_id,))
+    res = cursor.fetchone()
+    conn.close()
+    if not res:
+        return None
+    expire_date_str, is_lifetime = res
+    if is_lifetime == 1:
+        return "Umrbod (Lifetime 👑)"
+    if expire_date_str:
+        try:
+            expire_date = datetime.strptime(expire_date_str, "%Y-%m-%d %H:%M:%S")
+            if datetime.now() < expire_date:
+                return expire_date.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            pass
+    return None
+
+def get_premium_count():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM premium_users")
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
 
 # ----------------- FAVORITES -----------------
 
@@ -285,7 +402,6 @@ def get_favorites(user_id):
 # ----------------- RATINGS -----------------
 
 def rate_movie(user_id, movie_code, rating):
-    # rating: 1 for Like, -1 for Dislike
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
@@ -329,6 +445,25 @@ def get_user_referral_count(user_id):
     count = cursor.fetchone()[0]
     conn.close()
     return count
+
+# ----------------- SUPPORT TICKETS -----------------
+
+def add_support_ticket(user_id, message_id, user_text):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO support_tickets (user_id, message_id, user_text) VALUES (?, ?, ?)", (user_id, message_id, user_text))
+    ticket_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return ticket_id
+
+def get_support_ticket_by_msg(message_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT ticket_id, user_id, user_text FROM support_tickets WHERE message_id = ?", (message_id,))
+    res = cursor.fetchone()
+    conn.close()
+    return res
 
 # ----------------- CHANNELS & SETTINGS -----------------
 
