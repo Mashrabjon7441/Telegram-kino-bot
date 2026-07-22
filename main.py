@@ -1,8 +1,14 @@
+import os
+import threading
+import time
+import urllib.request
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import telebot
 from telebot import types
 import config
 import database
 import random
+
 
 # Initialize database
 database.init_db()
@@ -478,7 +484,50 @@ def process_channel_delete(message):
     else:
         bot.send_message(message.chat.id, f"❌ `{channel_id}` ro'yxatda topilmadi.", reply_markup=get_channels_keyboard())
 
+# ----------------- RENDER KEEP-ALIVE HTTP SERVER -----------------
+
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(b"Bot is running 24/7!")
+
+    def log_message(self, format, *args):
+        return  # Suppress HTTP server log outputs
+
+def start_health_check_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    print(f"Health check HTTP server running on port {port}...")
+    server.serve_forever()
+
+def keep_alive_pinger():
+    # Render sets RENDER_EXTERNAL_URL (e.g. https://telegram-kino-bot.onrender.com)
+    url = os.environ.get("RENDER_EXTERNAL_URL")
+    if not url:
+        return
+    
+    print(f"Keep-alive pinger started for: {url}")
+    while True:
+        time.sleep(600)  # Ping every 10 minutes (600 seconds)
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 KeepAlive'})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                print(f"Keep-alive auto-ping success: status {response.status}")
+        except Exception as e:
+            print(f"Keep-alive auto-ping error: {e}")
+
 # Start polling
 if __name__ == '__main__':
+    # Start web server thread for Render HTTP health check
+    web_thread = threading.Thread(target=start_health_check_server, daemon=True)
+    web_thread.start()
+    
+    # Start keep-alive auto-ping thread to prevent Render free instance from sleeping
+    ping_thread = threading.Thread(target=keep_alive_pinger, daemon=True)
+    ping_thread.start()
+
     print("Bot ishga tushmoqda...")
     bot.infinity_polling()
+
