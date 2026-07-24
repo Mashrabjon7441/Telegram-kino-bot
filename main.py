@@ -1386,28 +1386,43 @@ def process_web_movie_search(message):
         bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
         return
 
-    bot.send_message(message.chat.id, f"🔍 Internet ma'lumotlar bazasidan **'{query}'** filmi qidirilmoqda...", parse_mode="Markdown")
+    bot.send_message(message.chat.id, f"🔍 Internet ma'lumotlar bazasidan **'{query}'** (Kino yoki Serial) qidirilmoqda...", parse_mode="Markdown")
 
     try:
         import urllib.request
         import json
 
-        # TMDB Search API (Open Public Endpoint)
-        search_url = f"https://api.themoviedb.org/3/search/movie?api_key=15d2fe507544760256886e2e5fd93f2f&query={urllib.parse.quote(query)}&language=ru-RU"
-        req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0'})
+        # 1. Search Movie API
+        movie_url = f"https://api.themoviedb.org/3/search/movie?api_key=15d2fe507544760256886e2e5fd93f2f&query={urllib.parse.quote(query)}&language=ru-RU"
+        req = urllib.request.Request(movie_url, headers={'User-Agent': 'Mozilla/5.0'})
+        results = []
+        is_tv_series = False
+
         with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode())
             results = data.get('results', [])
 
+        # 2. If no movie result, Search TV Series API!
         if not results:
-            bot.send_message(message.chat.id, f"❌ Internet ma'lumotlar bazasida **'{query}'** filmi topilmadi.", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+            tv_url = f"https://api.themoviedb.org/3/search/tv?api_key=15d2fe507544760256886e2e5fd93f2f&query={urllib.parse.quote(query)}&language=ru-RU"
+            req2 = urllib.request.Request(tv_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req2, timeout=8) as resp2:
+                data2 = json.loads(resp2.read().decode())
+                results = data2.get('results', [])
+                if results:
+                    is_tv_series = True
+
+        if not results:
+            bot.send_message(message.chat.id, f"❌ Internet ma'lumotlar bazasida **'{query}'** nomli kino ham, serial ham topilmadi.", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
             return
 
-        movie_data = results[0]
-        title = movie_data.get('title') or movie_data.get('original_title') or query
-        overview = movie_data.get('overview') or "Internetdan topilgan kino tavsifi."
-        release_date = movie_data.get('release_date', '')[:4]
-        vote = movie_data.get('vote_average', 0)
+        item_data = results[0]
+        title = item_data.get('name') or item_data.get('title') or item_data.get('original_name') or query
+        overview = item_data.get('overview') or "Internetdan topilgan kino/serial tavsifi."
+        release_date = (item_data.get('first_air_date') or item_data.get('release_date') or '')[:4]
+        vote = item_data.get('vote_average', 0)
+
+        type_str = "📺 SERIAL" if is_tv_series else "🎬 KINO"
 
         # Detect Language
         detected_lang = "🇷🇺 Ruscha (На русском)"
@@ -1419,24 +1434,26 @@ def process_web_movie_search(message):
 
         # Save to database
         code = generate_unique_code()
-        database.add_movie(code, title, formatted_caption, "🌐 Boshqa", 0, detected_lang)
+        database.add_movie(code, f"[{type_str}] {title}", formatted_caption, "🌐 Boshqa", 0, detected_lang)
 
         # Notify Admin
         res_text = (
-            f"🎉 **INTERNETDAN KINO MA'LUMOTLARI AUTO-QIDIRIB TOPILDI VA SAQLANDI!**\n\n"
+            f"🎉 **INTERNETDAN {type_str} MA'LUMOTLARI AUTO-QIDIRIB TOPILDI VA SAQLANDI!**\n\n"
             f"🎬 **Nomi:** {title} ({release_date})\n"
+            f"📌 **Turi:** {type_str}\n"
             f"⭐ **Reyting:** {vote}/10\n"
             f"🌐 **Tili:** {detected_lang}\n"
             f"🔑 **Biriktirilgan Kod:** `{code}`\n\n"
-            f"📌 **Endi ushbu `{code}` kod ostiga video faylini qo'shishingiz mumkin!**"
+            f"📌 **Endi ushbu `{code}` kod ostiga serial qismlarini (1-qism, 2-qism...) yuklashingiz mumkin!**"
         )
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton(text="🎬 Video faylini yuklash", callback_data=f"add_more_ep:{code}"))
+        markup.add(types.InlineKeyboardButton(text="🎬 Seriya / Qism yuklash", callback_data=f"add_more_ep:{code}"))
 
         bot.send_message(message.chat.id, res_text, reply_markup=markup, parse_mode="Markdown")
 
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Qidirishda xatolik yuz berdi: {e}", reply_markup=get_admin_keyboard(user_id))
+
 
 def process_add_vip_movie(message):
 
