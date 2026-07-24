@@ -1111,18 +1111,19 @@ def text_handler(message):
         status = "✅ **FAOL & ULANGAN** 🟢" if userbot_session else "🔴 **SOZLANMAGAN**"
         
         msg_text = (
-            f"🚀 **TELEGRAM AKAUNT (TELETHON USERBOT) SOZLAMALARI:**\n\n"
+            f"🚀 **IKKINCHI (MANBA) TELEGRAM AKAUNTINGIZNI ULASH:**\n\n"
             f"📌 **Status:** {status}\n\n"
-            f"Ushbu modul yordamida bot sizning Telegram shaxsiy akauntingiz yoki maxsus bot-akauntingiz orqali **Telegramdagi BARCHA ochiq kino kanallardan** kinolarni avtomatik topib, haqiqiy MP4 video fayllari va 4 xonali kodlari bilan kanalingiz hamda botingizga avto-ko'chiradi!\n\n"
+            f"👍 **Juda to'g'ri qaror!** Shaxsiy admin profilizni berishingiz shart emas. Manba kanalida admin qilingan **ikkinchi ishchi Telegram akauntingizni (Worker Account)** ulashingiz mumkin!\n\n"
+            f"Ushbu akaunt Telegramdagi ochiq va yopiq kino kanallaridan kinolarni **haqiqiy video fayli va 4 xonali kodlari bilan** botingiz hamda kanalingizga avto-ko'chirib turadi!\n\n"
             f"⚙️ **Sozlash yo'riqnomasi:**\n"
-            f"1. [my.telegram.org](https://my.telegram.org) saytidan `api_id` va `api_hash` olasiz.\n"
-            f"2. Telegram telefon raqamingiz orqali 1 marta avtorizatsiyadan o'tiladi.\n\n"
-            f"Ulashni boshlash uchun o'zingizning `API_ID API_HASH`ingizni yuboring (Masalan: `123456 abcdef1234567890`)\n"
+            f"1. O'sha ikkinchi akauntingizdan [my.telegram.org](https://my.telegram.org) saytiga kirib `api_id` va `api_hash` olasiz.\n"
+            f"2. Botga o'sha akauntning `API_ID API_HASH`ini yuborasiz (Masalan: `123456 abcdef1234567890`)\n\n"
             f"*(Bekor qilish uchun 'bekor' deb yozing)*"
         )
         msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_telethon_config)
         return
+
 
 
 
