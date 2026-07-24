@@ -828,8 +828,17 @@ def text_handler(message):
 
     # Base Navigation Commands
     if text == "🔍 Kino qidirish":
-        bot.send_message(message.chat.id, "Kino kodi yoki nomini kiriting (Masalan: `1010` yoki `Avatar`):", parse_mode="Markdown")
+        msg = bot.send_message(
+            message.chat.id,
+            "🔍 **KINO QIDIRISH BO'LIMI:**\n\n"
+            "Kino yoki serialning **4 xonali kodini** yuboring (masalan: `1010`)\n"
+            "YOKI **kino nomini** yozib yuboring (masalan: `Avatar` yoki `Брат`):\n\n"
+            "*(Bekor qilish uchun 'bekor' deb yozing)*",
+            parse_mode="Markdown"
+        )
+        bot.register_next_step_handler(msg, process_user_search_query)
         return
+
 
     elif text == "📂 Janrlar":
         markup = types.InlineKeyboardMarkup(row_width=2)
@@ -1190,25 +1199,38 @@ def text_handler(message):
         )
         return
 
-    # Check Direct Movie Code Search
-    movie = database.get_movie(text)
-    if movie:
-        send_movie_card(message.chat.id, text, user_id)
+def process_user_search_query(message):
+    user_id = message.from_user.id
+    query_text = message.text.strip() if message.text else ""
+
+    if not query_text or query_text.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Qidirish bekor qilindi.", reply_markup=get_main_keyboard(user_id))
         return
 
-    # Name / Keyword Search Fallback
-    matches = database.search_movies_by_name(text)
+    # 1. Direct Code Match
+    movie = database.get_movie(query_text)
+    if movie:
+        send_movie_card(message.chat.id, query_text, user_id)
+        return
+
+    # 2. Name & Keyword Match
+    matches = database.search_movies_by_name(query_text)
     if matches:
         markup = types.InlineKeyboardMarkup(row_width=1)
         for code, title, genre, views, is_vip in matches:
-            vip_mark = " 🔒" if is_vip else ""
+            vip_mark = " 🔒 [VIP]" if is_vip else ""
             markup.add(types.InlineKeyboardButton(text=f"🎬 {title}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
 
-        bot.send_message(message.chat.id, f"🔍 **'{text}' bo'yicha topilgan kinolar:**", reply_markup=markup, parse_mode="Markdown")
+        bot.send_message(message.chat.id, f"🔍 **'{query_text}' bo'yicha topilgan kinolar:**", reply_markup=markup, parse_mode="Markdown")
     else:
-        bot.send_message(message.chat.id, "❌ Bunday kodli yoki nomli kino topilmadi. Kodni yoki nomini tekshirib qaytadan kiritib ko'ring.")
+        bot.send_message(
+            message.chat.id,
+            f"❌ **'{query_text}' nomli yoki kodli kino topilmadi.**\n\nNomini yoki kodini tekshirib qaytadan kiritib ko'ring yoki `@` orqali telegram qidiruvidan foydalaning.",
+            reply_markup=get_main_keyboard(user_id)
+        )
 
 # ----------------- SUPPORT & PREMIUM WORKFLOWS -----------------
+
 
 def process_user_support_message(message):
     user_id = message.from_user.id
@@ -1921,19 +1943,27 @@ def auto_movie_scout_worker():
 
                     code = generate_unique_code()
 
+                    # Auto VIP logic for popular/top-rated movies (Rating >= 7.5 or vote_count high)
+                    is_vip_flag = 1 if (vote and float(vote) >= 7.5) else 0
+
                     database.add_movie(code, m_title, caption_str, "🌐 Boshqa", 0, detected_lang)
-                    print(f"🤖 Auto-Scout auto-added: {m_title} (Code: {code})")
+                    if is_vip_flag:
+                        database.set_movie_vip(code, True)
+                    
+                    vip_badge = " 🔒 [VIP KINO]" if is_vip_flag else ""
+                    print(f"🤖 Auto-Scout auto-added: {m_title} (Code: {code}){vip_badge}")
 
                     # Immediate alert to Super Admins
                     alert_text = (
                         f"🤖 **INTERNETDAN YANGI KINO AVTOMATIK TOPILDI VA BOTGA QO'SHILDI!**\n\n"
-                        f"🎬 **Kino nomi:** {m_title} {f'({rel_year})' if rel_year else ''}\n"
+                        f"🎬 **Kino nomi:** {m_title} {f'({rel_year})' if rel_year else ''}{vip_badge}\n"
                         f"🌐 **Tili:** {detected_lang}\n"
                         f"⭐ **Reyting:** {vote}/10\n"
                         f"🔑 **Biriktirilgan Kod:** `{code}`\n\n"
                         f"*(Foydalanuvchilar botga `{code}` kodi yuborib tomosha qilishlari mumkin)*"
                     )
                     for admin_id in config.ADMIN_IDS:
+
                         try:
                             bot.send_message(admin_id, alert_text, parse_mode="Markdown")
                         except Exception as e:
