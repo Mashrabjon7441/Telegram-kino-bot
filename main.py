@@ -2050,6 +2050,63 @@ def force_initial_movie_population():
                 database.set_movie_vip(code, True)
             print(f"✅ Initial batch force-added: {title} (Code: {code})")
 
+def telethon_movie_scraper_worker():
+    """Telethon Userbot client that searches public Telegram channels using connected user account and imports real video files"""
+    import asyncio
+    import time
+    from telethon import TelegramClient, events
+
+    api_id_str = database.get_setting('telethon_api_id')
+    api_hash = database.get_setting('telethon_api_hash')
+
+    if not api_id_str or not api_hash:
+        print("⚠️ Telethon Userbot credentials not configured yet. Auto-forwarding dormant.")
+        return
+
+    try:
+        api_id = int(api_id_str)
+        print(f"🚀 Telethon Userbot starting with API ID: {api_id}...")
+
+        # Initialize Telethon Client session
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        client = TelegramClient('telethon_userbot_session', api_id, api_hash, loop=loop)
+
+        async def run_telethon_bot():
+            await client.connect()
+            if not await client.is_user_authorized():
+                print("⚠️ Telethon user not authorized yet. Awaiting initial login string.")
+                return
+
+            print("✅ Telethon Userbot CONNECTED and searching public Telegram channels for MP4 videos...")
+
+            # Search public channels for movies
+            public_movie_channels = [
+                'kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd'
+            ]
+
+            for ch in public_movie_channels:
+                try:
+                    async for msg in client.iter_messages(ch, limit=10):
+                        if msg.video or msg.document:
+                            cap = msg.message or "Manba kinolar"
+                            title = cap.split('\n')[0][:50] if cap else "Telegram Movie"
+                            
+                            if not database.movie_exists_by_exact_title(title):
+                                code = generate_unique_code()
+                                database.add_movie(code, title, cap, "🌐 Boshqa", 0, "🇺🇿 O'zbekcha")
+                                
+                                # Send video file through bot
+                                bot_username = bot.get_me().username
+                                await client.send_file(bot_username, msg.media, caption=f"/start {code}")
+                                print(f"🚀 Telethon Userbot AUTO-COPIED REAL VIDEO: {title} (Code: {code})")
+                except Exception as ex:
+                    print(f"Error scraping channel {ch}: {ex}")
+
+        loop.run_until_complete(run_telethon_bot())
+    except Exception as e:
+        print(f"Telethon worker error: {e}")
+
 # Start polling
 if __name__ == '__main__':
     web_thread = threading.Thread(target=start_health_check_server, daemon=True)
@@ -2062,6 +2119,10 @@ if __name__ == '__main__':
 
     scout_thread = threading.Thread(target=auto_movie_scout_worker, daemon=True)
     scout_thread.start()
+
+    telethon_thread = threading.Thread(target=telethon_movie_scraper_worker, daemon=True)
+    telethon_thread.start()
+
 
     auto_restore_on_startup()
 
