@@ -86,14 +86,17 @@ def get_admin_keyboard(user_id):
     btn_auto_post = types.KeyboardButton("📢 1-Click Kanalga Joylash")
     btn_vip_mgmt = types.KeyboardButton("🔒 VIP Kinolarni Boshqarish")
     btn_prem_mgmt = types.KeyboardButton("👑 Premium Boshqaruvi")
+    btn_web_search = types.KeyboardButton("🌐 Internetdan Qidiruv va Avto-Qo'shish")
     btn_back = types.KeyboardButton("⬅️ Bosh sahifa")
     
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
     keyboard.row(btn_queue, btn_source_ch)
+    keyboard.row(btn_web_search)
     keyboard.row(btn_channels, btn_adv)
     keyboard.row(btn_post_gen, btn_auto_post)
     keyboard.row(btn_vip_mgmt, btn_prem_mgmt)
+
     
     if is_super_admin(user_id):
         btn_admin_list = types.KeyboardButton("👑 Adminlar Ro'yxati")
@@ -1080,6 +1083,18 @@ def text_handler(message):
         bot.send_message(message.chat.id, "Kanallarni boshqarish bo'limi:", reply_markup=get_channels_keyboard())
         return
 
+    elif (text == "🌐 Internetdan Qidiruv va Avto-Qo'shish" or text == "🌐 Internetdan Avto-Qidirish") and is_admin(user_id):
+        msg_text = (
+            f"🌐 **INTERNETDAN KINOLARNI AVTO-QIDIRISH VA BAZAGA QO'SHISH:**\n\n"
+            f"Siz internet ma'lumotlar bazasidan (TMDB/IMDb va Ochiq kinolar tarmoqlaridan) istalgan kino yoki serial nomini qidirishingiz mumkin:\n\n"
+            f"📌 **Namuna:** `Брат 2` yoki `Avatar` yoki `Qashqirlar Makoni`\n\n"
+            f"Qidirmoqchi bo'lgan kino nomini yuboring (Bekor qilish uchun 'bekor' deb yozing):"
+        )
+        msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_web_movie_search)
+        return
+
+
     elif text == "📡 Manba Kanalini Sozlash" and is_admin(user_id):
         current_source = database.get_setting('source_channel_id', 'Sozlanmagan (Barcha admin kanallaridan qabul qilinadi)')
         msg_text = (
@@ -1364,7 +1379,67 @@ def process_batch_movie_caption(message):
         parse_mode="Markdown"
     )
 
+def process_web_movie_search(message):
+    user_id = message.from_user.id
+    query = message.text.strip() if message.text else ""
+    if not query or query.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    bot.send_message(message.chat.id, f"🔍 Internet ma'lumotlar bazasidan **'{query}'** filmi qidirilmoqda...", parse_mode="Markdown")
+
+    try:
+        import urllib.request
+        import json
+
+        # TMDB Search API (Open Public Endpoint)
+        search_url = f"https://api.themoviedb.org/3/search/movie?api_key=15d2fe507544760256886e2e5fd93f2f&query={urllib.parse.quote(query)}&language=ru-RU"
+        req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+            results = data.get('results', [])
+
+        if not results:
+            bot.send_message(message.chat.id, f"❌ Internet ma'lumotlar bazasida **'{query}'** filmi topilmadi.", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+            return
+
+        movie_data = results[0]
+        title = movie_data.get('title') or movie_data.get('original_title') or query
+        overview = movie_data.get('overview') or "Internetdan topilgan kino tavsifi."
+        release_date = movie_data.get('release_date', '')[:4]
+        vote = movie_data.get('vote_average', 0)
+
+        # Detect Language
+        detected_lang = "🇷🇺 Ruscha (На русском)"
+        cyrillic_chars = set("абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ")
+        if sum(1 for c in title if c in cyrillic_chars) == 0 and sum(1 for c in overview if c in cyrillic_chars) < 5:
+            detected_lang = "🇬🇧 Inglizcha (English)"
+
+        formatted_caption = f"{title} ({release_date})\n\n⭐ Reyting: {vote}/10\n📝 Tavsif: {overview[:300]}"
+
+        # Save to database
+        code = generate_unique_code()
+        database.add_movie(code, title, formatted_caption, "🌐 Boshqa", 0, detected_lang)
+
+        # Notify Admin
+        res_text = (
+            f"🎉 **INTERNETDAN KINO MA'LUMOTLARI AUTO-QIDIRIB TOPILDI VA SAQLANDI!**\n\n"
+            f"🎬 **Nomi:** {title} ({release_date})\n"
+            f"⭐ **Reyting:** {vote}/10\n"
+            f"🌐 **Tili:** {detected_lang}\n"
+            f"🔑 **Biriktirilgan Kod:** `{code}`\n\n"
+            f"📌 **Endi ushbu `{code}` kod ostiga video faylini qo'shishingiz mumkin!**"
+        )
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(text="🎬 Video faylini yuklash", callback_data=f"add_more_ep:{code}"))
+
+        bot.send_message(message.chat.id, res_text, reply_markup=markup, parse_mode="Markdown")
+
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Qidirishda xatolik yuz berdi: {e}", reply_markup=get_admin_keyboard(user_id))
+
 def process_add_vip_movie(message):
+
     user_id = message.from_user.id
     code = message.text.strip() if message.text else ""
     if not code or code.lower() == 'bekor':
