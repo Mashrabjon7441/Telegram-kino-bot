@@ -1924,10 +1924,10 @@ def auto_movie_scout_worker():
                     if not m_title:
                         continue
 
-                    # Exact check in database
-                    existing = database.search_movies_by_name(m_title)
-                    if existing:
+                    # Exact title check in database
+                    if database.movie_exists_by_exact_title(m_title):
                         continue
+
 
                     overview = item.get('overview', '') or "Avtomatik internetdan qidirib topilgan kino."
                     rel_year = (item.get('release_date') or '')[:4]

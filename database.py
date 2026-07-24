@@ -215,6 +215,14 @@ def toggle_movie_vip(code):
     conn.close()
     return True, bool(new_vip)
 
+def movie_exists_by_exact_title(title):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM movies WHERE title = ?", (title.strip(),))
+    res = cursor.fetchone()
+    conn.close()
+    return res is not None
+
 def search_movies_by_name(query):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -223,6 +231,7 @@ def search_movies_by_name(query):
     res = cursor.fetchall()
     conn.close()
     return res
+
 
 def get_movies_by_genre(genre):
     conn = sqlite3.connect(DB_NAME)
