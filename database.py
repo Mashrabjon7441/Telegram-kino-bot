@@ -681,8 +681,27 @@ def restore_db_from_bytes(data):
         return False
 
 def trigger_auto_backup(bot_instance):
-    # Database changes are saved locally in movies.db
-    pass
+    """Backs up the SQLite database file to Telegram Cloud by sending it to the super admin chat"""
+    try:
+        import config
+        if not bot_instance or not config.ADMIN_IDS:
+            return
+
+        admin_id = config.ADMIN_IDS[0]
+        if os.path.exists(DB_NAME):
+            with open(DB_NAME, 'rb') as f:
+                sent_msg = bot_instance.send_document(
+                    admin_id,
+                    f,
+                    caption="💾 **AUTOMATIC CLOUD BACKUP**\n\nDatabase state backed up safely to Telegram Cloud.",
+                    visible_file_name="movies_backup.db"
+                )
+                if sent_msg and sent_msg.document:
+                    file_id = sent_msg.document.file_id
+                    set_setting('latest_backup_file_id', file_id)
+                    print(f"💾 [Cloud Backup Success] Saved backup file_id: {file_id[:15]}...")
+    except Exception as e:
+        print(f"⚠️ Cloud Backup Error: {e}")
 
 
 # ----------------- PENDING QUEUE HELPERS -----------------

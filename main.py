@@ -791,6 +791,7 @@ def handle_private_video_or_doc(message):
         movie = database.get_movie(code)
         if movie:
             database.add_episode(code, "To'liq film", file_id)
+            database.trigger_auto_backup(bot)
             print(f"✅ [Auto-Attach] Video file_id ({file_id[:15]}...) successfully linked to Movie Code {code} ({movie[1]})")
             try:
                 bot.send_message(message.chat.id, f"✅ Video `{code}` kodli kino ({movie[1]}) bilan muvaffaqiyatli saqlandi!", parse_mode="Markdown")
@@ -2321,6 +2322,7 @@ def telethon_movie_scraper_worker():
                                     
                                     # Send video file through bot
                                     await client.send_file(bot_username, msg.media, caption=f"/start {code}")
+                                    database.trigger_auto_backup(bot)
                                     print(f"🚀 Telethon Userbot AUTO-COPIED UNLIMITED VIDEO: {full_title} (Code: {code})")
                                     await asyncio.sleep(2)
                     except Exception as ex:
@@ -2343,6 +2345,10 @@ if __name__ == '__main__':
     ping_thread = threading.Thread(target=keep_alive_pinger, daemon=True)
     ping_thread.start()
 
+    # 1. Restore database from Telegram Cloud FIRST before force-populating demo movies!
+    auto_restore_on_startup()
+
+    # 2. Only populate demo batch if database is still brand new/empty
     force_initial_movie_population()
 
     scout_thread = threading.Thread(target=auto_movie_scout_worker, daemon=True)
@@ -2350,9 +2356,6 @@ if __name__ == '__main__':
 
     telethon_thread = threading.Thread(target=telethon_movie_scraper_worker, daemon=True)
     telethon_thread.start()
-
-
-    auto_restore_on_startup()
 
 
     print("Bot ishga tushmoqda...")
