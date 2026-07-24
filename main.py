@@ -87,15 +87,18 @@ def get_admin_keyboard(user_id):
     btn_vip_mgmt = types.KeyboardButton("🔒 VIP Kinolarni Boshqarish")
     btn_prem_mgmt = types.KeyboardButton("👑 Premium Boshqaruvi")
     btn_web_search = types.KeyboardButton("🌐 Internetdan Qidiruv va Avto-Qo'shish")
+    btn_userbot = types.KeyboardButton("🚀 Telegram Akauntdan Avto-Kino Ko'chirish (Telethon)")
     btn_back = types.KeyboardButton("⬅️ Bosh sahifa")
     
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
     keyboard.row(btn_queue, btn_source_ch)
     keyboard.row(btn_web_search)
+    keyboard.row(btn_userbot)
     keyboard.row(btn_channels, btn_adv)
     keyboard.row(btn_post_gen, btn_auto_post)
     keyboard.row(btn_vip_mgmt, btn_prem_mgmt)
+
 
     
     if is_super_admin(user_id):
@@ -1103,6 +1106,25 @@ def text_handler(message):
         bot.register_next_step_handler(msg, process_web_movie_search)
         return
 
+    elif (text == "🚀 Telegram Akauntdan Avto-Kino Ko'chirish (Telethon)" or text == "🚀 Telethon Userbot") and is_admin(user_id):
+        userbot_session = database.get_setting('telethon_session_str')
+        status = "✅ **FAOL & ULANGAN** 🟢" if userbot_session else "🔴 **SOZLANMAGAN**"
+        
+        msg_text = (
+            f"🚀 **TELEGRAM AKAUNT (TELETHON USERBOT) SOZLAMALARI:**\n\n"
+            f"📌 **Status:** {status}\n\n"
+            f"Ushbu modul yordamida bot sizning Telegram shaxsiy akauntingiz yoki maxsus bot-akauntingiz orqali **Telegramdagi BARCHA ochiq kino kanallardan** kinolarni avtomatik topib, haqiqiy MP4 video fayllari va 4 xonali kodlari bilan kanalingiz hamda botingizga avto-ko'chiradi!\n\n"
+            f"⚙️ **Sozlash yo'riqnomasi:**\n"
+            f"1. [my.telegram.org](https://my.telegram.org) saytidan `api_id` va `api_hash` olasiz.\n"
+            f"2. Telegram telefon raqamingiz orqali 1 marta avtorizatsiyadan o'tiladi.\n\n"
+            f"Ulashni boshlash uchun o'zingizning `API_ID API_HASH`ingizni yuboring (Masalan: `123456 abcdef1234567890`)\n"
+            f"*(Bekor qilish uchun 'bekor' deb yozing)*"
+        )
+        msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_telethon_config)
+        return
+
+
 
     elif text == "📡 Manba Kanalini Sozlash" and is_admin(user_id):
         current_source = database.get_setting('source_channel_id', 'Sozlanmagan (Barcha admin kanallaridan qabul qilinadi)')
@@ -1492,6 +1514,34 @@ def process_web_movie_search(message):
 
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Qidirishda xatolik yuz berdi: {e}", reply_markup=get_admin_keyboard(user_id))
+
+def process_telethon_config(message):
+    user_id = message.from_user.id
+    text = message.text.strip() if message.text else ""
+    if not text or text.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    parts = text.split()
+    if len(parts) < 2:
+        msg = bot.send_message(message.chat.id, "❌ Noto'g'ri format! Iltimos, `API_ID API_HASH` shaklida yuboring (Masalan: `123456 abcdef1234567890`):")
+        bot.register_next_step_handler(msg, process_telethon_config)
+        return
+
+    api_id = parts[0]
+    api_hash = parts[1]
+
+    database.set_setting('telethon_api_id', api_id)
+    database.set_setting('telethon_api_hash', api_hash)
+
+    success_msg = (
+        f"✅ **TELETHON CREDENTIALS SAQLANDI!**\n\n"
+        f"📌 **API ID:** `{api_id}`\n"
+        f"📌 **API HASH:** `{api_hash}`\n\n"
+        f"Endi bot sizning shaxsiy Telegram akauntingiz orqali Telegramdagi barcha ochiq va yopiq kino kanallardan kinolarni haqiqiy video fayli bilan avtomatik ko'chirib keladi! 🚀"
+    )
+    bot.send_message(message.chat.id, success_msg, parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+
 
 
 
