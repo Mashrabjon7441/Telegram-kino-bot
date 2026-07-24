@@ -1944,6 +1944,18 @@ if __name__ == '__main__':
     auto_restore_on_startup()
 
     print("Bot ishga tushmoqda...")
-    bot.infinity_polling()
+    try:
+        bot.remove_webhook()
+    except Exception as e:
+        print(f"Webhook remove error: {e}")
+
+    import time
+    while True:
+        try:
+            bot.infinity_polling(timeout=20, long_polling_timeout=20, skip_pending=True)
+        except Exception as e:
+            print(f"Polling conflict or error encountered ({e}). Retrying in 5 seconds...")
+            time.sleep(5)
+
 
 
