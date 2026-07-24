@@ -92,11 +92,15 @@ def get_admin_keyboard(user_id):
     keyboard.row(btn_vip_mgmt, btn_prem_mgmt)
     
     if is_super_admin(user_id):
+        btn_admin_list = types.KeyboardButton("👑 Adminlar Ro'yxati")
+        btn_admin_del = types.KeyboardButton("➖ Admin o'chirish")
         btn_promo = types.KeyboardButton("🔑 Admin kodi yaratish")
+        keyboard.row(btn_admin_list, btn_admin_del)
         keyboard.row(btn_promo)
         
     keyboard.row(btn_back)
     return keyboard
+
 
 
 
@@ -532,6 +536,30 @@ def callback_handler(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, "Reklama yuborish bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
 
+    elif call.data == "vip_add_prompt":
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(call.message.chat.id, "🔒 **VIP (Faqat Premium)** statusiga o'tkazmoqchi bo'lgan kino kodini kiriting (Masalan: `1230`):", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_add_vip_movie)
+
+    elif call.data == "vip_remove_prompt":
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(call.message.chat.id, "🌐 **VIP statusidan chiqarmoqchi (Barchaga ochiq qilmoqchi)** bo'lgan kino kodini kiriting (Masalan: `1230`):", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_remove_vip_movie)
+
+    elif call.data == "vip_list_show":
+        bot.answer_callback_query(call.id)
+        vip_movies = database.get_vip_movies()
+        if not vip_movies:
+            bot.send_message(call.message.chat.id, "🔒 **Hozirda VIP kinolar yo'q.**", parse_mode="Markdown")
+            return
+
+        list_text = "🔒 **BARCHA VIP KINOLAR RO'YXATI:**\n\n"
+        for code, title, genre, views in vip_movies:
+            list_text += f"🔑 `{code}` - **{title}** ({genre}) | 👁 `{views}` ta\n"
+
+        bot.send_message(call.message.chat.id, list_text, parse_mode="Markdown")
+
+
     elif call.data == "start_batch_naming":
         bot.answer_callback_query(call.id)
         ask_next_batch_movie(call.message.chat.id, user_id)
@@ -902,9 +930,46 @@ def text_handler(message):
         return
 
     elif text == "🔒 VIP Kinolarni Boshqarish" and is_admin(user_id):
-        msg = bot.send_message(message.chat.id, "VIP statusini o'zgartirmoqchi bo'lgan kino kodini kiriting (Masalan: 1230):")
-        bot.register_next_step_handler(msg, process_toggle_vip_movie)
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(
+            types.InlineKeyboardButton(text="➕ VIP ga qo'shish", callback_data="vip_add_prompt"),
+            types.InlineKeyboardButton(text="❌ VIP dan chiqarish", callback_data="vip_remove_prompt"),
+            types.InlineKeyboardButton(text="📋 VIP Kinolar Ro'yxati", callback_data="vip_list_show")
+        )
+        bot.send_message(
+            message.chat.id,
+            "🔒 **VIP KINOLARNI BOSHQARISH BO'LIMI:**\n\n"
+            "VIP kinolar faqat Premium a'zolarga taqdim etiladi.\n"
+            "Boshqarish uchun kerakli amalingizni tanlang:",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
         return
+
+    elif text == "👑 Adminlar Ro'yxati" and is_super_admin(user_id):
+        db_admins = database.get_db_admins()
+        super_admins = config.ADMIN_IDS
+
+        list_text = "👑 **BOT ADMINLARI RO'YXATI:**\n\n"
+        list_text += "🔴 **Bosh Adminlar (Super Admin):**\n"
+        for sa in super_admins:
+            list_text += f"• `{sa}`\n"
+
+        list_text += "\n🟡 **Kino Qo'shuvchi Adminlar:**\n"
+        if db_admins:
+            for da in db_admins:
+                list_text += f"• `{da}`\n"
+        else:
+            list_text += "*(Hozircha yo'q)*\n"
+
+        bot.send_message(message.chat.id, list_text, parse_mode="Markdown")
+        return
+
+    elif text == "➖ Admin o'chirish" and is_super_admin(user_id):
+        msg = bot.send_message(message.chat.id, "O'chirmoqchi bo'lgan adminning Telegram ID sini kiriting (Masalan: `79012345`):\n\nBekor qilish uchun 'bekor' deb yozing.")
+        bot.register_next_step_handler(msg, process_remove_admin_id)
+        return
+
 
     elif text == "👑 Premium Boshqaruvi" and is_admin(user_id):
         msg_text = (
@@ -1212,20 +1277,53 @@ def process_batch_movie_caption(message):
         parse_mode="Markdown"
     )
 
-def process_toggle_vip_movie(message):
-
+def process_add_vip_movie(message):
     user_id = message.from_user.id
     code = message.text.strip() if message.text else ""
     if not code or code.lower() == 'bekor':
         bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
         return
 
-    found, is_vip = database.toggle_movie_vip(code)
+    found = database.set_movie_vip(code, True)
     if found:
-        status_str = "🔒 **VIP (Faqat Premium)**" if is_vip else "🌐 **Oddiy (Barchaga ochiq)**"
-        bot.send_message(message.chat.id, f"✅ `{code}` kodli kino statusi o'zgartirildi: {status_str}", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+        bot.send_message(message.chat.id, f"✅ `{code}` kodli kino **🔒 VIP statusiga (Faqat Premium)** o'tkazildi!", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
     else:
         bot.send_message(message.chat.id, f"❌ `{code}` kodli kino topilmadi.", reply_markup=get_admin_keyboard(user_id))
+
+def process_remove_vip_movie(message):
+    user_id = message.from_user.id
+    code = message.text.strip() if message.text else ""
+    if not code or code.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    found = database.set_movie_vip(code, False)
+    if found:
+        bot.send_message(message.chat.id, f"✅ `{code}` kodli kino **🌐 Oddiy statusga (Barchaga ochiq)** o'tkazildi!", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+    else:
+        bot.send_message(message.chat.id, f"❌ `{code}` kodli kino topilmadi.", reply_markup=get_admin_keyboard(user_id))
+
+def process_remove_admin_id(message):
+    user_id = message.from_user.id
+    if not is_super_admin(user_id):
+        return
+
+    text = message.text.strip() if message.text else ""
+    if not text or text.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    if not text.isdigit():
+        bot.send_message(message.chat.id, "Xato: Admin Telegram ID faqat raqamlardan iborat bo'lishi kerak.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    target_admin_id = int(text)
+    deleted = database.remove_db_admin(target_admin_id)
+    if deleted:
+        bot.send_message(message.chat.id, f"✅ Admin (`{target_admin_id}`) muvaffaqiyatli o'chirildi!", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+    else:
+        bot.send_message(message.chat.id, f"❌ Admin (`{target_admin_id}`) topilmadi yoki allaqachon o'chirilgan.", reply_markup=get_admin_keyboard(user_id))
+
 
 def process_db_restore_file(message):
     user_id = message.from_user.id

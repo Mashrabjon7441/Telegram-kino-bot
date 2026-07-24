@@ -561,6 +561,23 @@ def add_db_admin(user_id):
     conn.commit()
     conn.close()
 
+def remove_db_admin(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM admins WHERE user_id = ?", (user_id,))
+    conn.commit()
+    deleted = cursor.rowcount > 0
+    conn.close()
+    return deleted
+
+def get_db_admins():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM admins")
+    res = cursor.fetchall()
+    conn.close()
+    return [r[0] for r in res]
+
 def is_db_admin(user_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -568,6 +585,24 @@ def is_db_admin(user_id):
     res = cursor.fetchone()
     conn.close()
     return res is not None
+
+def get_vip_movies():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT code, title, genre, views FROM movies WHERE is_vip = 1 ORDER BY id DESC")
+    res = cursor.fetchall()
+    conn.close()
+    return res
+
+def set_movie_vip(code, is_vip):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE movies SET is_vip = ? WHERE code = ?", (1 if is_vip else 0, code.strip()))
+    conn.commit()
+    found = cursor.rowcount > 0
+    conn.close()
+    return found
+
 
 # ----------------- MOVIE SUBSCRIPTIONS & RANDOM MOVIE -----------------
 
