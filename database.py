@@ -37,8 +37,11 @@ def init_db():
         cursor.execute("ALTER TABLE movies ADD COLUMN views INTEGER DEFAULT 0")
     if 'is_vip' not in columns:
         cursor.execute("ALTER TABLE movies ADD COLUMN is_vip INTEGER DEFAULT 0")
+    if 'language' not in columns:
+        cursor.execute("ALTER TABLE movies ADD COLUMN language TEXT DEFAULT '🇺🇿 O''zbekcha'")
 
     # Create episodes table
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS episodes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -172,14 +175,14 @@ def get_users_count():
     conn.close()
     return count
 
-def add_movie(code, title, caption, genre='Umumiy', is_vip=0):
+def add_movie(code, title, caption, genre='Umumiy', is_vip=0, language="🇺🇿 O'zbekcha"):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            INSERT OR REPLACE INTO movies (code, title, caption, genre, views, is_vip)
-            VALUES (?, ?, ?, ?, COALESCE((SELECT views FROM movies WHERE code = ?), 0), ?)
-        """, (code.strip(), title.strip(), caption.strip() if caption else "", genre.strip(), code.strip(), is_vip))
+            INSERT OR REPLACE INTO movies (code, title, caption, genre, views, is_vip, language)
+            VALUES (?, ?, ?, ?, COALESCE((SELECT views FROM movies WHERE code = ?), 0), ?, ?)
+        """, (code.strip(), title.strip(), caption.strip() if caption else "", genre.strip(), code.strip(), is_vip, language.strip()))
         conn.commit()
         success = True
     except Exception as e:
@@ -192,7 +195,7 @@ def add_movie(code, title, caption, genre='Umumiy', is_vip=0):
 def get_movie(code):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT code, title, caption, genre, views, is_vip FROM movies WHERE code = ?", (code.strip(),))
+    cursor.execute("SELECT code, title, caption, genre, views, is_vip, language FROM movies WHERE code = ?", (code.strip(),))
     res = cursor.fetchone()
     conn.close()
     return res
@@ -216,7 +219,7 @@ def search_movies_by_name(query):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     search = f"%{query.strip()}%"
-    cursor.execute("SELECT code, title, genre, views, is_vip FROM movies WHERE title LIKE ? OR caption LIKE ? LIMIT 20", (search, search))
+    cursor.execute("SELECT code, title, genre, views, is_vip, language FROM movies WHERE title LIKE ? OR caption LIKE ? LIMIT 20", (search, search))
     res = cursor.fetchall()
     conn.close()
     return res
@@ -224,12 +227,21 @@ def search_movies_by_name(query):
 def get_movies_by_genre(genre):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT code, title, views, is_vip FROM movies WHERE genre = ? ORDER BY id DESC LIMIT 30", (genre.strip(),))
+    cursor.execute("SELECT code, title, views, is_vip, language FROM movies WHERE genre = ? ORDER BY id DESC LIMIT 30", (genre.strip(),))
+    res = cursor.fetchall()
+    conn.close()
+    return res
+
+def get_movies_by_language(language):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT code, title, genre, views, is_vip FROM movies WHERE language LIKE ? ORDER BY id DESC LIMIT 30", (f"%{language.strip()}%",))
     res = cursor.fetchall()
     conn.close()
     return res
 
 def get_top_movies(limit=10):
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT code, title, views, genre, is_vip FROM movies ORDER BY views DESC LIMIT ?", (limit,))

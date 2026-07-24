@@ -44,11 +44,14 @@ def generate_unique_code():
         if not database.get_movie(code):
             return code
 
+LANGUAGES = ["🇺🇿 O'zbekcha", "🇷🇺 Ruscha (На русском)", "🇬🇧 Inglizcha (English)"]
+
 # Keyboards
 def get_main_keyboard(user_id):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn_search = types.KeyboardButton("🔍 Kino qidirish")
     btn_genres = types.KeyboardButton("📂 Janrlar")
+    btn_lang = types.KeyboardButton("🌐 Til bo'yicha kinolar")
     btn_top = types.KeyboardButton("🔥 Top 10 kinolar")
     btn_fav = types.KeyboardButton("❤️ Sevimlilarim")
     btn_profile = types.KeyboardButton("👤 Shaxsiy Profil")
@@ -58,10 +61,11 @@ def get_main_keyboard(user_id):
     btn_supp = types.KeyboardButton("✍️ Adminga Murojaat")
     
     keyboard.row(btn_search, btn_genres)
-    keyboard.row(btn_top, btn_fav)
-    keyboard.row(btn_profile, btn_random)
-    keyboard.row(btn_ref, btn_prem)
-    keyboard.row(btn_supp)
+    keyboard.row(btn_lang, btn_top)
+    keyboard.row(btn_fav, btn_profile)
+    keyboard.row(btn_random, btn_ref)
+    keyboard.row(btn_prem, btn_supp)
+
     
     if is_admin(user_id):
         btn_admin = types.KeyboardButton("⚙️ Admin panel")
@@ -169,7 +173,8 @@ def send_movie_card(chat_id, code, user_id):
         bot.send_message(chat_id, "❌ Bunday kodli kino topilmadi.")
         return
 
-    code, title, caption, genre, views, is_vip = movie
+    code, title, caption, genre, views, is_vip = movie[:6]
+    lang = movie[6] if len(movie) >= 7 and movie[6] else "🇺🇿 O'zbekcha"
 
     # VIP Protection Check
     if is_vip and not database.is_premium_user(user_id) and not is_admin(user_id):
@@ -178,6 +183,7 @@ def send_movie_card(chat_id, code, user_id):
         vip_text = (
             f"🔒 **Ushbu kino faqat 👑 Premium foydalanuvchilar uchun!**\n\n"
             f"🎬 **Kino:** {title}\n"
+            f"🌐 **Tili:** {lang}\n"
             f"🔑 **Kodi:** `{code}`\n\n"
             f"💳 **Obuna Narxlari:**\n"
             f"• 1 oy — **10,000 so'm**\n"
@@ -192,8 +198,6 @@ def send_movie_card(chat_id, code, user_id):
         bot.send_message(chat_id, vip_text, reply_markup=markup, parse_mode="Markdown")
         return
 
-
-
     database.increment_movie_views(code)
     likes, dislikes = database.get_movie_ratings(code)
     episodes = database.get_episodes(code)
@@ -206,6 +210,7 @@ def send_movie_card(chat_id, code, user_id):
 
     text = (
         f"🎬 **Kino nomi:** {title}{vip_badge}\n"
+        f"🌐 **Tili:** {lang}\n"
         f"🎭 **Janr:** {genre}\n"
         f"🔑 **Kodi:** `{code}`\n"
         f"👁 **Ko'rishlar:** {views + 1} ta\n"
@@ -215,6 +220,7 @@ def send_movie_card(chat_id, code, user_id):
         text += f"\n📝 **Tavsif:** {caption}"
 
     text += "\n\nTomosha qilish uchun quyidagi tugmalarni bosing 👇"
+
 
     markup = types.InlineKeyboardMarkup(row_width=1)
     
@@ -445,7 +451,23 @@ def callback_handler(call):
         else:
             bot.answer_callback_query(call.id, "❌ Ushbu qism topilmadi!", show_alert=True)
 
+    elif call.data.startswith("lang_filter:"):
+        lang_target = call.data.split(":")[1]
+        movies = database.get_movies_by_language(lang_target)
+        if not movies:
+            bot.answer_callback_query(call.id, f"{lang_target} tilida hali kinolar yo'q.", show_alert=True)
+            return
+
+        bot.answer_callback_query(call.id)
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for code, title, genre, views, is_vip in movies:
+            vip_mark = " 🔒" if is_vip else ""
+            markup.add(types.InlineKeyboardButton(text=f"🎬 {title}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
+
+        bot.send_message(call.message.chat.id, f"🌐 **{lang_target}** tilidagi kinolar ro'yxati:", reply_markup=markup, parse_mode="Markdown")
+
     elif call.data.startswith("genre:"):
+
         genre_name = call.data.split(":")[1]
         movies = database.get_movies_by_genre(genre_name)
         if not movies:
@@ -480,17 +502,19 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, f"Janr tanlandi: {genre}")
         title = admin_states.get(user_id, {}).get('title', 'Kino')
         caption = admin_states.get(user_id, {}).get('caption', '')
+        lang = admin_states.get(user_id, {}).get('language', "🇺🇿 O'zbekcha")
         
         code = generate_unique_code()
-        success = database.add_movie(code, title, caption, genre)
+        success = database.add_movie(code, title, caption, genre, 0, lang)
         if success:
             database.trigger_auto_backup(bot)
             bot.send_message(
                 call.message.chat.id,
-                f"✅ Yangi kino yaratildi!\n🔑 Biriktirilgan Kod: `{code}`\n🎬 Nomi: *{title}*\n🎭 Janr: *{genre}*\n\nEndi ushbu kod ostiga qismlarini (video fayllarini) yuklaymiz.",
+                f"✅ Yangi kino yaratildi!\n🔑 Biriktirilgan Kod: `{code}`\n🎬 Nomi: *{title}*\n🌐 Tili: *{lang}*\n🎭 Janr: *{genre}*\n\nEndi ushbu kod ostiga qismlarini (video fayllarini) yuklaymiz.",
                 parse_mode="Markdown"
             )
             ask_for_episode_file(call.message, code)
+
 
         else:
             bot.send_message(call.message.chat.id, "Xatolik yuz berdi ma'lumotlar bazasida.", reply_markup=get_admin_keyboard(user_id))
@@ -587,21 +611,23 @@ def callback_handler(call):
         file_id = state.get('file_id')
         title = state.get('title')
         caption = state.get('caption', '')
+        lang = state.get('language', "🇺🇿 O'zbekcha")
 
         if not pending_id or not file_id or not title:
             bot.answer_callback_query(call.id, "❌ Ma'lumot topilmadi!", show_alert=True)
             return
 
         code = generate_unique_code()
-        database.add_movie(code, title, caption, genre)
+        database.add_movie(code, title, caption, genre, 0, lang)
         database.add_episode(code, "To'liq film", file_id)
         database.mark_pending_fulfilled(pending_id)
 
         bot.answer_callback_query(call.id, f"✅ Kino #{queue_num} saqlandi!")
-        bot.send_message(call.message.chat.id, f"✅ **Kino #{queue_num}** (*{title}*) saqlandi! (🔑 Kod: `{code}`)", parse_mode="Markdown")
+        bot.send_message(call.message.chat.id, f"✅ **Kino #{queue_num}** (*{title}*) saqlandi!\n🌐 **Tili:** {lang} | 🔑 **Kod:** `{code}`", parse_mode="Markdown")
 
         # Automatically ask for the next pending movie in queue!
         ask_next_batch_movie(call.message.chat.id, user_id)
+
 
 
     elif call.data.startswith("fill_video:"):
@@ -671,11 +697,19 @@ def handle_channel_movie_post(message):
         title_extracted = clean_title if clean_title else raw_title
         desc_extracted = "\n".join(lines[1:]) if len(lines) > 1 else ""
 
+    # Auto-detect language (Russian Cyrillic vs Uzbek Latin/Cyrillic)
+    detected_lang = "🇺🇿 O'zbekcha"
+    cyrillic_chars = set("абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ")
+    c_count = sum(1 for char in caption if char in cyrillic_chars)
+    if c_count > 10:
+        detected_lang = "🇷🇺 Ruscha (На русском)"
+
     q_num = database.add_to_pending_queue(file_id, title=title_extracted, caption=desc_extracted)
 
     alert_text = (
         f"📥 **MANBA KANALIDAN YANGI KINO KELDI!**\n\n"
-        f"📌 **Kino #{q_num}** sifatida kutilayotganlar navbatiga qo'shildi.\n"
+        f"📌 **Kino #{q_num}** sifatida navbatga qo'shildi.\n"
+        f"🌐 **Aniqlangan tili:** {detected_lang}\n"
         f"*(Siz uni **`📥 Kutilayotgan Kinolar`** bo'limi orqali nomlashingiz va kod biriktirishingiz mumkin)*"
     )
     for admin_id in config.ADMIN_IDS:
@@ -683,6 +717,7 @@ def handle_channel_movie_post(message):
             bot.send_message(admin_id, alert_text, parse_mode="Markdown")
         except Exception as e:
             print(f"Failed to notify admin {admin_id}: {e}")
+
 
 
 
@@ -758,6 +793,17 @@ def text_handler(message):
         markup.add(*btns)
         bot.send_message(message.chat.id, "📂 **Kino janrini tanlang:**", reply_markup=markup, parse_mode="Markdown")
         return
+
+    elif text == "🌐 Til bo'yicha kinolar":
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(
+            types.InlineKeyboardButton(text="🇺🇿 O'zbek tilidagi kinolar", callback_data="lang_filter:🇺🇿 O'zbekcha"),
+            types.InlineKeyboardButton(text="🇷🇺 Rus tilidagi kinolar (На русском)", callback_data="lang_filter:🇷🇺 Ruscha"),
+            types.InlineKeyboardButton(text="🇬🇧 Ingliz tilidagi kinolar (English)", callback_data="lang_filter:🇬🇧 Inglizcha")
+        )
+        bot.send_message(message.chat.id, "🌐 **O'zingizga ma'qul tilni tanlang:**", reply_markup=markup, parse_mode="Markdown")
+        return
+
 
     elif text == "🔥 Top 10 kinolar":
         top_movies = database.get_top_movies(10)
