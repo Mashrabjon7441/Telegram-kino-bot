@@ -90,11 +90,15 @@ def get_admin_keyboard(user_id):
     btn_userbot = types.KeyboardButton("🚀 Telegram Akauntdan Avto-Kino Ko'chirish (Telethon)")
     btn_back = types.KeyboardButton("⬅️ Bosh sahifa")
     
+    is_paused = database.get_setting('telethon_scraper_paused') == '1'
+    btn_pause = types.KeyboardButton("▶️ Avto-Yuklashni Davom Ettirish") if is_paused else types.KeyboardButton("⏸️ Avto-Yuklashni Vaqtincha To'xtatish")
+
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
     keyboard.row(btn_queue, btn_source_ch)
     keyboard.row(btn_web_search)
     keyboard.row(btn_userbot)
+    keyboard.row(btn_pause)
     keyboard.row(btn_channels, btn_adv)
     keyboard.row(btn_post_gen, btn_auto_post)
     keyboard.row(btn_vip_mgmt, btn_prem_mgmt)
@@ -1153,6 +1157,29 @@ def text_handler(message):
         )
         msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_telethon_config)
+        return
+
+    elif (text == "⏸️ Avto-Yuklashni Vaqtincha To'xtatish" or text == "⏸️ Avto-Yuklashni Pauza Qilish") and is_admin(user_id):
+        database.set_setting('telethon_scraper_paused', '1')
+        bot.send_message(
+            message.chat.id,
+            "⏸️ **AVTO-YUKLASH VAQTINCHA TO'XTATILDI!**\n\n"
+            "Telethon roboti kanallardan yangi va eski kinolarni avtomatik ko'chirishni vaqtincha pauzaga qo'ydi.\n\n"
+            "*(Qayta yoqish uchun **`▶️ Avto-Yuklashni Davom Ettirish`** tugmasini bosing)*",
+            reply_markup=get_admin_keyboard(user_id),
+            parse_mode="Markdown"
+        )
+        return
+
+    elif (text == "▶️ Avto-Yuklashni Davom Ettirish" or text == "▶️ Avto-Yuklashni Yoqish") and is_admin(user_id):
+        database.set_setting('telethon_scraper_paused', '0')
+        bot.send_message(
+            message.chat.id,
+            "▶️ **AVTO-YUKLASH QAYTA ISHGA TUSHIRILDI!** 🚀\n\n"
+            "Telethon roboti kanallardan barcha kino hamda seriallarni avtomatik ko'chirishni davom ettirmoqda!",
+            reply_markup=get_admin_keyboard(user_id),
+            parse_mode="Markdown"
+        )
         return
 
     elif (text == "🔄 Serverni Qayta Ishga Tushirish" or text == "/restart") and is_admin(user_id):
@@ -2260,6 +2287,10 @@ def telethon_movie_scraper_worker():
                     public_movie_channels.insert(0, clean_target)
 
             while True:
+                if database.get_setting('telethon_scraper_paused') == '1':
+                    await asyncio.sleep(15)
+                    continue
+
                 for ch in public_movie_channels:
                     try:
                         # limit=None fetches ALL messages in channel history without any cap!
