@@ -1537,14 +1537,86 @@ def process_telethon_config(message):
     database.set_setting('telethon_session_str', f"{api_id}:{api_hash}")
     database.trigger_auto_backup(bot)
 
-    success_msg = (
-        f"✅ **TELETHON KREDENTSIYALLARI SAQLANDI VA ULANGANI TASDIQLANDI!** 🟢\n\n"
-        f"📌 **API ID:** `{api_id}`\n"
-        f"📌 **API HASH:** `{api_hash}`\n"
-        f"📌 **Status:** ✅ **FAOL & ULANGAN** 🟢\n\n"
-        f"Endi bot sizning ikkinchi Telegram akauntingiz kuchi orqali Telegramdagi barcha ochiq kino kanallardan kinolarni haqiqiy MP4 video fayli bilan avtomatik ko'chirib keladi! 🚀"
+    msg_text = (
+        f"✅ **API ID VA API HASH SAQLANDI!**\n\n"
+        f"Endi akauntingizni Telegram xavfsizlik tizimi bilan to'liq ulash uchun **ikkinchi akauntingizning Telefon Raqamini** xalqaro formatda yuboring:\n\n"
+        f"📌 **Format:** `+998901234567`\n"
+        f"*(Bekor qilish uchun 'bekor' deb yozing)*"
     )
-    bot.send_message(message.chat.id, success_msg, parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+    msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
+    bot.register_next_step_handler(msg, process_telethon_phone_step, api_id, api_hash)
+
+def process_telethon_phone_step(message, api_id, api_hash):
+    user_id = message.from_user.id
+    phone = message.text.strip() if message.text else ""
+    if not phone or phone.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    bot.send_message(message.chat.id, f"📲 Telegram xavfsizlik serveriga **{phone}** raqami bo'yicha SMS kod so'rovi yuborilmoqda...", parse_mode="Markdown")
+
+    try:
+        import asyncio
+        from telethon import TelegramClient
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        client = TelegramClient('telethon_userbot_session', int(api_id), api_hash, loop=loop)
+
+        async def send_code_req():
+            await client.connect()
+            sent = await client.send_code_request(phone)
+            return sent.phone_code_hash
+
+        phone_code_hash = loop.run_until_complete(send_code_req())
+
+        msg_text = (
+            f"📩 **TELEGRAM KOD YUBORILDI!**\n\n"
+            f"Telegram ilovangizga yoki SMS orqali kelgan **5 xonali tasdiqlash kodini** yuboring:\n\n"
+            f"📌 **Namuna:** `12345`\n"
+            f"*(Bekor qilish uchun 'bekor' deb yozing)*"
+        )
+        msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_telethon_sms_step, api_id, api_hash, phone, phone_code_hash)
+
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Telegram xavfsizlik kod so'rovida xatolik yuz berdi: {e}", reply_markup=get_admin_keyboard(user_id))
+
+def process_telethon_sms_step(message, api_id, api_hash, phone, phone_code_hash):
+    user_id = message.from_user.id
+    code = message.text.strip() if message.text else ""
+    if not code or code.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    bot.send_message(message.chat.id, "🔐 Telegram akauntingiz muvaffaqiyatli avtorizatsiyadan o'tkazilmoqda...", parse_mode="Markdown")
+
+    try:
+        import asyncio
+        from telethon import TelegramClient
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        client = TelegramClient('telethon_userbot_session', int(api_id), api_hash, loop=loop)
+
+        async def complete_login():
+            await client.connect()
+            await client.sign_in(phone, code, phone_code_hash=phone_code_hash)
+            return True
+
+        loop.run_until_complete(complete_login())
+        database.set_setting('telethon_authorized', '1')
+
+        success_text = (
+            f"🎉 **TABRIKLAYMIZ! IKKINCHI TELEGRAM AKAUNTINGIZ BOTGA TO'LIQ ULANDI!** 🟢\n\n"
+            f"📌 **Status:** ✅ **FAOL & ULANGAN** 🟢\n\n"
+            f"Endi bot sizning ikkinchi akauntingiz orqali Telegramdagi barcha ochiq kino kanallardan kinolarni **HAQIQIY MP4 VIDEO FAYLI BILAN** avtomatik ko'chirishni boshladi! 🚀"
+        )
+        bot.send_message(message.chat.id, success_text, parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Tasdiqlash kodini kiritishda xatolik: {e}\n\nKodni qaytadan tekshirib kiritib ko'ring.", reply_markup=get_admin_keyboard(user_id))
+
 
 
 
