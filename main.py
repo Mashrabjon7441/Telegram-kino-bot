@@ -690,33 +690,74 @@ def handle_channel_movie_post(message):
     title_extracted = ""
     desc_extracted = ""
 
+    # Case A: Post HAS caption/title -> Instantly Auto-Publish to Bot Movies Database!
     if caption:
         lines = [line.strip() for line in caption.split("\n") if line.strip()]
-        raw_title = lines[0] if lines else ""
+        raw_title = lines[0] if lines else "Kino"
         clean_title = " ".join([word for word in raw_title.split() if not word.startswith("#")])
-        title_extracted = clean_title if clean_title else raw_title
-        desc_extracted = "\n".join(lines[1:]) if len(lines) > 1 else ""
+        if not clean_title:
+            clean_title = raw_title
 
-    # Auto-detect language (Russian Cyrillic vs Uzbek Latin/Cyrillic)
-    detected_lang = "🇺🇿 O'zbekcha"
-    cyrillic_chars = set("абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ")
-    c_count = sum(1 for char in caption if char in cyrillic_chars)
-    if c_count > 10:
-        detected_lang = "🇷🇺 Ruscha (На русском)"
+        # Auto-detect genre from hashtag if present
+        detected_genre = "🌐 Boshqa"
+        caption_lower = caption.lower()
+        if "#jangari" in caption_lower or "#action" in caption_lower:
+            detected_genre = "💥 Jangari"
+        elif "#komediya" in caption_lower or "#comedy" in caption_lower:
+            detected_genre = "😂 Komediya"
+        elif "#melodrama" in caption_lower or "#romance" in caption_lower:
+            detected_genre = "❤️ Melodrama"
+        elif "#multfilm" in caption_lower or "#cartoon" in caption_lower:
+            detected_genre = "🦁 Multfilm"
+        elif "#fantastika" in caption_lower or "#scifi" in caption_lower:
+            detected_genre = "🚀 Fantastika"
+        elif "#qorqinchli" in caption_lower or "#horror" in caption_lower:
+            detected_genre = "👻 Qo'rqinchli"
+        elif "#drama" in caption_lower:
+            detected_genre = "🎭 Drama"
 
-    q_num = database.add_to_pending_queue(file_id, title=title_extracted, caption=desc_extracted)
+        description = "\n".join(lines[1:]) if len(lines) > 1 else ""
 
-    alert_text = (
-        f"📥 **MANBA KANALIDAN YANGI KINO KELDI!**\n\n"
-        f"📌 **Kino #{q_num}** sifatida navbatga qo'shildi.\n"
-        f"🌐 **Aniqlangan tili:** {detected_lang}\n"
-        f"*(Siz uni **`📥 Kutilayotgan Kinolar`** bo'limi orqali nomlashingiz va kod biriktirishingiz mumkin)*"
-    )
-    for admin_id in config.ADMIN_IDS:
-        try:
-            bot.send_message(admin_id, alert_text, parse_mode="Markdown")
-        except Exception as e:
-            print(f"Failed to notify admin {admin_id}: {e}")
+        # Auto-detect language (Russian Cyrillic vs Uzbek Latin/Cyrillic)
+        detected_lang = "🇺🇿 O'zbekcha"
+        cyrillic_chars = set("абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ")
+        c_count = sum(1 for char in caption if char in cyrillic_chars)
+        if c_count > 10:
+            detected_lang = "🇷🇺 Ruscha (На русском)"
+
+        code = generate_unique_code()
+        database.add_movie(code, clean_title, description, detected_genre, 0, detected_lang)
+        database.add_episode(code, "To'liq film", file_id)
+
+        # Immediate Admin Notification
+        notice_text = (
+            f"🎉 **MANBA KANALIDAN YANGI KINO AVTOMATIK BAZAGA QO'SHILDI!**\n\n"
+            f"🎬 **Kino nomi:** {clean_title}\n"
+            f"🌐 **Tili:** {detected_lang}\n"
+            f"🎭 **Janr:** {detected_genre}\n"
+            f"🔑 **Biriktirilgan Kod:** `{code}`\n\n"
+            f"*(Foydalanuvchilar `{code}` kodi orqali tomosha qilishlari mumkin)*"
+        )
+        for admin_id in config.ADMIN_IDS:
+            try:
+                bot.send_message(admin_id, notice_text, parse_mode="Markdown")
+            except Exception as e:
+                print(f"Failed to notify admin {admin_id}: {e}")
+
+    # Case B: Post HAS NO caption -> Add to pending queue and notify admin
+    else:
+        q_num = database.add_to_pending_queue(file_id, title="", caption="")
+        alert_text = (
+            f"📥 **MANBA KANALIGA NOMSIZ VIDEO KELDI!**\n\n"
+            f"📌 **Kino #{q_num}** sifatida kutilayotganlar navbatiga qo'shildi.\n"
+            f"*(Siz uni **`📥 Kutilayotgan Kinolar`** bo'limi orqali nomlashingiz va kod biriktirishingiz mumkin)*"
+        )
+        for admin_id in config.ADMIN_IDS:
+            try:
+                bot.send_message(admin_id, alert_text, parse_mode="Markdown")
+            except Exception as e:
+                print(f"Failed to notify admin {admin_id}: {e}")
+
 
 
 
