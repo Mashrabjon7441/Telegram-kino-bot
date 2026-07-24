@@ -1128,17 +1128,20 @@ def text_handler(message):
 
 
     elif text == "📡 Manba Kanalini Sozlash" and is_admin(user_id):
-        current_source = database.get_setting('source_channel_id', 'Sozlanmagan (Barcha admin kanallaridan qabul qilinadi)')
+        current_source = database.get_setting('source_channel_id', 'Sozlanmagan (Barcha target kanallardan olinadi)')
+        telethon_target = database.get_setting('telethon_target_channel', 'Sozlanmagan (@kinolar_tv, @uzbek_kinolar...)')
         msg_text = (
-            f"📡 **KINOLAR UCHUN MANBA KANALI SOZLAMALARI:**\n\n"
-            f"📌 **Hozirgi Manba Kanali:** `{current_source}`\n\n"
-            f"Yangi manba kanali username yoki ID-sini kiriting (Masalan: `@my_private_movies` yoki `-100123456789`):\n"
-            f"*(Kanaldan avtomatik kinolar olinishi uchun bot shu kanalda Admin bo'lishi shart!)*\n\n"
+            f"📡 **AVTO-KO'CHIRISH UCHUN MANBA KANALI SOZLAMALARI:**\n\n"
+            f"📌 **Hozirgi Manba Kanali:** `{current_source}`\n"
+            f"📌 **Telethon Maqsadi:** `{telethon_target}`\n\n"
+            f"Botingiz va Telethon robotingiz avtomatik ko'chirishi kerak bo'lgan Telegram kanal username-ni kiriting (Masalan: `@kinolar_tv` yoki `@my_movies_channel`):\n\n"
+            f"*(Ushbu kanalning BARCHA kinolarini hamda seriallarini 5,000 tagacha tarixdan avto-ko'chirib keladi!)*\n\n"
             f"Bekor qilish uchun 'bekor' deb yozing."
         )
         msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_set_source_channel)
         return
+
 
     elif (text == "📥 Kutilayotgan Kinolar" or text == "📥 Kutilayotgan Kinolar (Queue)") and is_admin(user_id):
         pending_count = database.get_pending_queue_count()
@@ -1957,7 +1960,27 @@ def process_channel_delete(message):
     else:
         bot.send_message(message.chat.id, f"❌ `{channel_id}` ro'yxatda topilmadi.", reply_markup=get_channels_keyboard())
 
+def process_set_source_channel(message):
+    user_id = message.from_user.id
+    target = message.text.strip() if message.text else ""
+    if not target or target.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    clean_target = target.replace('@', '').strip()
+    database.set_setting('source_channel_id', f"@{clean_target}")
+    database.set_setting('telethon_target_channel', f"@{clean_target}")
+    database.trigger_auto_backup(bot)
+
+    success_msg = (
+        f"✅ **MANBA KANALI MUVAFFAQIYATLI SOZLANDI!** 🚀\n\n"
+        f"📌 **Manba Kanal Username:** `@{clean_target}`\n\n"
+        f"Endi botingiz hamda Telethon robotingiz ushbu `@{clean_target}` kanalining **BARCHA kinolari hamda seriallarini (5,000 tagacha tarixdan)** haqiqiy MP4 video fayli va 4 xonali unikal kodlari bilan avtomatik ko'chirib keladi!"
+    )
+    bot.send_message(message.chat.id, success_msg, parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+
 # ----------------- RENDER KEEP-ALIVE HTTP SERVER -----------------
+
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -2152,37 +2175,48 @@ def telethon_movie_scraper_worker():
 
             print("✅ Telethon Userbot CONNECTED and searching public Telegram channels for MP4 videos...")
 
-            # Ultra-Deep historic search in public channels for both old & new movies (Up to 5,000 historic messages per channel!)
+            # Ultra-Deep historic search in public & custom specified channels
+            custom_target_channel = database.get_setting('telethon_target_channel')
             public_movie_channels = [
                 'kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd', 'top_kinolar'
             ]
+            if custom_target_channel:
+                public_movie_channels.insert(0, custom_target_channel.replace('@', '').strip())
 
             while True:
                 for ch in public_movie_channels:
                     try:
                         async for msg in client.iter_messages(ch, limit=5000):
                             if msg.video or msg.document:
-                                cap = msg.message or "Manba kinolar"
-                                title = cap.split('\n')[0][:50] if cap else "Telegram Movie"
-                                
-                                if not database.movie_exists_by_exact_title(title):
+                                cap = msg.message or "Manba kino"
+                                raw_title = cap.split('\n')[0][:60] if cap else "Telegram Movie"
+                                clean_title = " ".join([w for w in raw_title.split() if not w.startswith('#')])
+                                if not clean_title:
+                                    clean_title = raw_title
+
+                                cap_lower = cap.lower()
+                                is_serial = ("qism" in cap_lower or "серия" in cap_lower or "сезон" in cap_lower or "#serial" in cap_lower)
+                                type_prefix = "[📺 SERIAL] " if is_serial else ""
+                                full_title = f"{type_prefix}{clean_title}"
+
+                                if not database.movie_exists_by_exact_title(full_title):
                                     code = generate_unique_code()
-                                    database.add_movie(code, title, cap, "🌐 Boshqa", 0, "🇺🇿 O'zbekcha")
+                                    database.add_movie(code, full_title, cap, "🌐 Boshqa", 0, "🇺🇿 O'zbekcha")
                                     
                                     # Send video file through bot
                                     bot_username = bot.get_me().username
                                     await client.send_file(bot_username, msg.media, caption=f"/start {code}")
-                                    print(f"🚀 Telethon Userbot AUTO-COPIED HISTORIC VIDEO: {title} (Code: {code})")
+                                    print(f"🚀 Telethon Userbot AUTO-COPIED VIDEO: {full_title} (Code: {code})")
                                     await asyncio.sleep(2)
                     except Exception as ex:
                         print(f"Error scraping channel {ch}: {ex}")
                 
                 await asyncio.sleep(300)
 
-
         loop.run_until_complete(run_telethon_bot())
     except Exception as e:
         print(f"Telethon worker error: {e}")
+
 
 
 # Start polling
