@@ -108,7 +108,8 @@ def get_admin_keyboard(user_id):
         keyboard.row(btn_admin_list, btn_admin_del)
         keyboard.row(btn_promo)
         
-    keyboard.row(btn_back)
+    btn_restart = types.KeyboardButton("🔄 Serverni Qayta Ishga Tushirish")
+    keyboard.row(btn_restart, btn_back)
     return keyboard
 
 
@@ -764,6 +765,36 @@ def handle_channel_movie_post(message):
             except Exception as e:
                 print(f"Failed to notify admin {admin_id}: {e}")
 
+# ----------------- PRIVATE CHAT VIDEO / DOCUMENT AUTO-ATTACH HANDLER -----------------
+@bot.message_handler(content_types=['video', 'document'])
+def handle_private_video_or_doc(message):
+    """Captures videos sent in private chat (e.g. by Telethon userbot or direct upload) and links file_id to database"""
+    if message.chat.type != 'private':
+        return
+
+    file_id = message.video.file_id if message.video else (message.document.file_id if message.document else None)
+    if not file_id:
+        return
+
+    caption = message.caption or ""
+    import re
+    match = re.search(r'/start\s+(\d+)', caption)
+    if not match:
+        match = re.search(r'\b(\d{4,5})\b', caption)
+
+    if match:
+        code = match.group(1)
+        movie = database.get_movie(code)
+        if movie:
+            database.add_episode(code, "To'liq film", file_id)
+            print(f"✅ [Auto-Attach] Video file_id ({file_id[:15]}...) successfully linked to Movie Code {code} ({movie[1]})")
+            try:
+                bot.send_message(message.chat.id, f"✅ Video `{code}` kodli kino ({movie[1]}) bilan muvaffaqiyatli saqlandi!", parse_mode="Markdown")
+            except Exception:
+                pass
+            return
+
+
 
 
 
@@ -1122,6 +1153,18 @@ def text_handler(message):
         )
         msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_telethon_config)
+        return
+
+    elif (text == "🔄 Serverni Qayta Ishga Tushirish" or text == "/restart") and is_admin(user_id):
+        bot.send_message(
+            message.chat.id,
+            "🔄 **SERVER VA BOT QAYTA ISHGA TUSHIRILMOQDA...** 🚀\n\n"
+            "Barcha ma'lumotlar saqlandi. Bir necha soniyada bot yangilangan kod va yangi xotira bilan avtomatik ishga tushadi!",
+            parse_mode="Markdown"
+        )
+        time.sleep(2)
+        import sys, os
+        os.execv(sys.executable, [sys.executable] + sys.argv)
         return
 
 
@@ -1569,7 +1612,9 @@ def process_telethon_phone_step(message, api_id, api_hash):
         async def send_code_req():
             await client.connect()
             sent = await client.send_code_request(phone)
-            return sent.phone_code_hash
+            res = sent.phone_code_hash
+            await client.disconnect()
+            return res
 
         phone_code_hash = loop.run_until_complete(send_code_req())
 
@@ -1605,10 +1650,15 @@ def process_telethon_sms_step(message, api_id, api_hash, phone, phone_code_hash)
         async def complete_login():
             await client.connect()
             await client.sign_in(phone, code, phone_code_hash=phone_code_hash)
+            await client.disconnect()
             return True
 
         loop.run_until_complete(complete_login())
         database.set_setting('telethon_authorized', '1')
+
+        # Launch scraper thread now that session is authorized!
+        t = threading.Thread(target=telethon_movie_scraper_worker, daemon=True)
+        t.start()
 
         success_text = (
             f"🎉 **TABRIKLAYMIZ! IKKINCHI TELEGRAM AKAUNTINGIZ BOTGA TO'LIQ ULANDI!** 🟢\n\n"
@@ -2014,7 +2064,6 @@ def keep_alive_pinger():
             print(f"Keep-alive auto-ping error: {e}")
 
 def auto_restore_on_startup():
-
     try:
         movies = database.get_all_movies()
         if movies:
@@ -2043,8 +2092,14 @@ def auto_restore_on_startup():
 
 def auto_movie_scout_worker():
     """Background worker that continuously fetches open-source movie metadata and auto-populates movies.db"""
+    custom_tmdb_key = database.get_setting('tmdb_api_key')
+    if not custom_tmdb_key:
+        print("ℹ️ TMDB API kaliti kiritilmagan. TMDB Auto-Movie Scout faol emas.")
+        return
+
     import time
     import urllib.request
+    import urllib.error
     import json
     import random
 
@@ -2060,10 +2115,12 @@ def auto_movie_scout_worker():
 
     while True:
         random.shuffle(search_terms)
+        unauthorized_encountered = False
+
         for term in search_terms:
             try:
                 page = random.randint(1, 3)
-                url = f"https://api.themoviedb.org/3/search/movie?api_key=c6d1d490bb5982845c48b2eb594b29c9&query={urllib.parse.quote(term)}&language=ru-RU&page={page}"
+                url = f"https://api.themoviedb.org/3/search/movie?api_key={custom_tmdb_key}&query={urllib.parse.quote(term)}&language=ru-RU&page={page}"
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req, timeout=6) as resp:
                     data = json.loads(resp.read().decode())
@@ -2077,7 +2134,6 @@ def auto_movie_scout_worker():
                     # Exact title check in database
                     if database.movie_exists_by_exact_title(m_title):
                         continue
-
 
                     overview = item.get('overview', '') or "Avtomatik internetdan qidirib topilgan kino."
                     rel_year = (item.get('release_date') or '')[:4]
@@ -2113,17 +2169,27 @@ def auto_movie_scout_worker():
                         f"*(Foydalanuvchilar botga `{code}` kodi yuborib tomosha qilishlari mumkin)*"
                     )
                     for admin_id in config.ADMIN_IDS:
-
                         try:
                             bot.send_message(admin_id, alert_text, parse_mode="Markdown")
                         except Exception as e:
                             print(f"Scout notification error to {admin_id}: {e}")
 
                     time.sleep(2)
+
+            except urllib.error.HTTPError as http_err:
+                if http_err.code == 401:
+                    print("⚠️ TMDB API Kaliti yaroqsiz (HTTP Error 401). TMDB Scout to'xtatildi.")
+                    unauthorized_encountered = True
+                    break
+                else:
+                    print(f"Scout HTTP error for '{term}': {http_err}")
             except Exception as err:
                 print(f"Scout term error for '{term}': {err}")
 
-        time.sleep(60)
+        if unauthorized_encountered:
+            time.sleep(3600)
+        else:
+            time.sleep(60)
 
 
 
@@ -2153,9 +2219,10 @@ def telethon_movie_scraper_worker():
 
     api_id_str = database.get_setting('telethon_api_id')
     api_hash = database.get_setting('telethon_api_hash')
+    is_auth = database.get_setting('telethon_authorized')
 
-    if not api_id_str or not api_hash:
-        print("⚠️ Telethon Userbot credentials not configured yet. Auto-forwarding dormant.")
+    if not api_id_str or not api_hash or is_auth != '1':
+        print("⚠️ Telethon Userbot credentials not authorized yet. Auto-forwarding dormant.")
         return
 
     try:
@@ -2175,6 +2242,12 @@ def telethon_movie_scraper_worker():
 
             print("✅ Telethon Userbot CONNECTED and searching public Telegram channels for MP4 videos...")
 
+            try:
+                bot_info = bot.get_me()
+                bot_username = bot_info.username
+            except Exception:
+                bot_username = "me"
+
             # Unlimited historic search (Iterate ALL messages in specified channels!)
             import re
             custom_target_channel = database.get_setting('telethon_target_channel')
@@ -2182,7 +2255,9 @@ def telethon_movie_scraper_worker():
                 'kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd', 'top_kinolar'
             ]
             if custom_target_channel:
-                public_movie_channels.insert(0, custom_target_channel.replace('@', '').strip())
+                clean_target = custom_target_channel.replace('@', '').strip()
+                if clean_target and clean_target not in public_movie_channels:
+                    public_movie_channels.insert(0, clean_target)
 
             while True:
                 for ch in public_movie_channels:
@@ -2214,7 +2289,6 @@ def telethon_movie_scraper_worker():
                                     database.add_movie(code, full_title, cap, "🌐 Boshqa", 0, "🇺🇿 O'zbekcha")
                                     
                                     # Send video file through bot
-                                    bot_username = bot.get_me().username
                                     await client.send_file(bot_username, msg.media, caption=f"/start {code}")
                                     print(f"🚀 Telethon Userbot AUTO-COPIED UNLIMITED VIDEO: {full_title} (Code: {code})")
                                     await asyncio.sleep(2)

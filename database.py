@@ -7,8 +7,10 @@ DB_NAME = os.path.join(BASE_DIR, "movies.db")
 
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL;")
+    cursor.execute("PRAGMA busy_timeout = 30000;")
     
     # Check if migration is needed (if episodes table does not exist, recreate schema)
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='episodes';")
@@ -161,14 +163,14 @@ def init_db():
 
 
 def add_user(user_id, username, referred_by=None):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("INSERT OR IGNORE INTO users (user_id, username, referred_by) VALUES (?, ?, ?)", (user_id, username, referred_by))
     conn.commit()
     conn.close()
 
 def get_users_count():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM users")
     count = cursor.fetchone()[0]
@@ -176,7 +178,7 @@ def get_users_count():
     return count
 
 def add_movie(code, title, caption, genre='Umumiy', is_vip=0, language="🇺🇿 O'zbekcha"):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     try:
         cursor.execute("""
@@ -193,7 +195,7 @@ def add_movie(code, title, caption, genre='Umumiy', is_vip=0, language="🇺🇿
     return success
 
 def get_movie(code):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT code, title, caption, genre, views, is_vip, language FROM movies WHERE code = ?", (code.strip(),))
     res = cursor.fetchone()
@@ -201,7 +203,7 @@ def get_movie(code):
     return res
 
 def toggle_movie_vip(code):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT is_vip FROM movies WHERE code = ?", (code.strip(),))
     res = cursor.fetchone()
@@ -216,7 +218,7 @@ def toggle_movie_vip(code):
     return True, bool(new_vip)
 
 def movie_exists_by_exact_title(title):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT 1 FROM movies WHERE title = ?", (title.strip(),))
     res = cursor.fetchone()
@@ -224,7 +226,7 @@ def movie_exists_by_exact_title(title):
     return res is not None
 
 def search_movies_by_name(query):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     search = f"%{query.strip()}%"
     cursor.execute("SELECT code, title, genre, views, is_vip, language FROM movies WHERE title LIKE ? OR caption LIKE ? LIMIT 20", (search, search))
@@ -234,7 +236,7 @@ def search_movies_by_name(query):
 
 
 def get_movies_by_genre(genre):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT code, title, views, is_vip, language FROM movies WHERE genre = ? ORDER BY id DESC LIMIT 30", (genre.strip(),))
     res = cursor.fetchall()
@@ -242,7 +244,7 @@ def get_movies_by_genre(genre):
     return res
 
 def get_movies_by_language(language):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT code, title, genre, views, is_vip FROM movies WHERE language LIKE ? ORDER BY id DESC LIMIT 30", (f"%{language.strip()}%",))
     res = cursor.fetchall()
@@ -251,7 +253,7 @@ def get_movies_by_language(language):
 
 def get_top_movies(limit=10):
 
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT code, title, views, genre, is_vip FROM movies ORDER BY views DESC LIMIT ?", (limit,))
     res = cursor.fetchall()
@@ -259,14 +261,14 @@ def get_top_movies(limit=10):
     return res
 
 def increment_movie_views(code):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("UPDATE movies SET views = views + 1 WHERE code = ?", (code.strip(),))
     conn.commit()
     conn.close()
 
 def add_episode(movie_code, episode_title, file_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     try:
         cursor.execute("""
@@ -283,7 +285,7 @@ def add_episode(movie_code, episode_title, file_id):
     return success
 
 def get_episodes(movie_code):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT id, episode_title, file_id FROM episodes WHERE movie_code = ?", (movie_code.strip(),))
     res = cursor.fetchall()
@@ -291,7 +293,7 @@ def get_episodes(movie_code):
     return res
 
 def get_episode_by_id(episode_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT file_id, episode_title, movie_code FROM episodes WHERE id = ?", (episode_id,))
     res = cursor.fetchone()
@@ -299,7 +301,7 @@ def get_episode_by_id(episode_id):
     return res
 
 def delete_movie(code):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM episodes WHERE movie_code = ?", (code.strip(),))
     cursor.execute("DELETE FROM movies WHERE code = ?", (code.strip(),))
@@ -311,7 +313,7 @@ def delete_movie(code):
     return deleted
 
 def delete_episode(episode_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM episodes WHERE id = ?", (episode_id,))
     conn.commit()
@@ -320,7 +322,7 @@ def delete_episode(episode_id):
     return deleted
 
 def get_all_movies():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT code, title, genre, views, is_vip FROM movies ORDER BY id DESC")
     res = cursor.fetchall()
@@ -330,7 +332,7 @@ def get_all_movies():
 # ----------------- PREMIUM USERS -----------------
 
 def is_premium_user(user_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT expire_date, is_lifetime FROM premium_users WHERE user_id = ?", (user_id,))
     res = cursor.fetchone()
@@ -349,7 +351,7 @@ def is_premium_user(user_id):
     return False
 
 def add_premium(user_id, days=30, is_lifetime=False):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     if is_lifetime:
         cursor.execute("INSERT OR REPLACE INTO premium_users (user_id, expire_date, is_lifetime) VALUES (?, NULL, 1)", (user_id,))
@@ -370,7 +372,7 @@ def add_premium(user_id, days=30, is_lifetime=False):
     conn.close()
 
 def remove_premium(user_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM premium_users WHERE user_id = ?", (user_id,))
     conn.commit()
@@ -379,7 +381,7 @@ def remove_premium(user_id):
     return deleted
 
 def get_premium_info(user_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT expire_date, is_lifetime FROM premium_users WHERE user_id = ?", (user_id,))
     res = cursor.fetchone()
@@ -399,7 +401,7 @@ def get_premium_info(user_id):
     return None
 
 def get_premium_count():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM premium_users")
     count = cursor.fetchone()[0]
@@ -409,7 +411,7 @@ def get_premium_count():
 # ----------------- FAVORITES -----------------
 
 def toggle_favorite(user_id, movie_code):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT 1 FROM favorites WHERE user_id = ? AND movie_code = ?", (user_id, movie_code.strip()))
     if cursor.fetchone():
@@ -423,7 +425,7 @@ def toggle_favorite(user_id, movie_code):
     return added
 
 def is_favorite(user_id, movie_code):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT 1 FROM favorites WHERE user_id = ? AND movie_code = ?", (user_id, movie_code.strip()))
     res = cursor.fetchone()
@@ -431,7 +433,7 @@ def is_favorite(user_id, movie_code):
     return res is not None
 
 def get_favorites(user_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT m.code, m.title, m.genre 
@@ -446,7 +448,7 @@ def get_favorites(user_id):
 # ----------------- RATINGS -----------------
 
 def rate_movie(user_id, movie_code, rating):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("""
         INSERT OR REPLACE INTO ratings (user_id, movie_code, rating)
@@ -456,7 +458,7 @@ def rate_movie(user_id, movie_code, rating):
     conn.close()
 
 def get_movie_ratings(movie_code):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM ratings WHERE movie_code = ? AND rating = 1", (movie_code.strip(),))
     likes = cursor.fetchone()[0]
@@ -470,7 +472,7 @@ def get_movie_ratings(movie_code):
 def add_referral(referrer_id, new_user_id):
     if referrer_id == new_user_id:
         return False
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     try:
         cursor.execute("INSERT INTO referrals (referrer_id, referred_id) VALUES (?, ?)", (referrer_id, new_user_id))
@@ -483,7 +485,7 @@ def add_referral(referrer_id, new_user_id):
     return success
 
 def get_user_referral_count(user_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM referrals WHERE referrer_id = ?", (user_id,))
     count = cursor.fetchone()[0]
@@ -493,7 +495,7 @@ def get_user_referral_count(user_id):
 # ----------------- SUPPORT TICKETS -----------------
 
 def add_support_ticket(user_id, message_id, user_text):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("INSERT INTO support_tickets (user_id, message_id, user_text) VALUES (?, ?, ?)", (user_id, message_id, user_text))
     ticket_id = cursor.lastrowid
@@ -502,7 +504,7 @@ def add_support_ticket(user_id, message_id, user_text):
     return ticket_id
 
 def get_support_ticket_by_msg(message_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT ticket_id, user_id, user_text FROM support_tickets WHERE message_id = ?", (message_id,))
     res = cursor.fetchone()
@@ -512,7 +514,7 @@ def get_support_ticket_by_msg(message_id):
 # ----------------- CHANNELS & SETTINGS -----------------
 
 def add_channel(channel_id, title, invite_link):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     try:
         cursor.execute("""
@@ -529,7 +531,7 @@ def add_channel(channel_id, title, invite_link):
     return success
 
 def delete_channel(channel_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM channels WHERE channel_id = ?", (channel_id.strip(),))
     conn.commit()
@@ -538,7 +540,7 @@ def delete_channel(channel_id):
     return deleted
 
 def get_channels():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT channel_id, title, invite_link FROM channels")
     res = cursor.fetchall()
@@ -546,7 +548,7 @@ def get_channels():
     return res
 
 def get_users():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT user_id FROM users")
     res = cursor.fetchall()
@@ -554,14 +556,14 @@ def get_users():
     return [row[0] for row in res]
 
 def set_setting(key, value):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key.strip(), value.strip()))
     conn.commit()
     conn.close()
 
 def get_setting(key, default=None):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT value FROM settings WHERE key = ?", (key.strip(),))
     res = cursor.fetchone()
@@ -569,21 +571,21 @@ def get_setting(key, default=None):
     return res[0] if res else default
 
 def delete_setting(key):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM settings WHERE key = ?", (key.strip(),))
     conn.commit()
     conn.close()
 
 def add_db_admin(user_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("INSERT OR IGNORE INTO admins (user_id) VALUES (?)", (user_id,))
     conn.commit()
     conn.close()
 
 def remove_db_admin(user_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM admins WHERE user_id = ?", (user_id,))
     conn.commit()
@@ -592,7 +594,7 @@ def remove_db_admin(user_id):
     return deleted
 
 def get_db_admins():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT user_id FROM admins")
     res = cursor.fetchall()
@@ -600,7 +602,7 @@ def get_db_admins():
     return [r[0] for r in res]
 
 def is_db_admin(user_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT user_id FROM admins WHERE user_id = ?", (user_id,))
     res = cursor.fetchone()
@@ -608,7 +610,7 @@ def is_db_admin(user_id):
     return res is not None
 
 def get_vip_movies():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT code, title, genre, views FROM movies WHERE is_vip = 1 ORDER BY id DESC")
     res = cursor.fetchall()
@@ -616,7 +618,7 @@ def get_vip_movies():
     return res
 
 def set_movie_vip(code, is_vip):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("UPDATE movies SET is_vip = ? WHERE code = ?", (1 if is_vip else 0, code.strip()))
     conn.commit()
@@ -628,7 +630,7 @@ def set_movie_vip(code, is_vip):
 # ----------------- MOVIE SUBSCRIPTIONS & RANDOM MOVIE -----------------
 
 def toggle_movie_subscription(user_id, movie_code):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT 1 FROM movie_subscriptions WHERE user_id = ? AND movie_code = ?", (user_id, movie_code.strip()))
     if cursor.fetchone():
@@ -642,7 +644,7 @@ def toggle_movie_subscription(user_id, movie_code):
     return subscribed
 
 def is_movie_subscribed(user_id, movie_code):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT 1 FROM movie_subscriptions WHERE user_id = ? AND movie_code = ?", (user_id, movie_code.strip()))
     res = cursor.fetchone()
@@ -650,7 +652,7 @@ def is_movie_subscribed(user_id, movie_code):
     return res is not None
 
 def get_movie_subscribers(movie_code):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT user_id FROM movie_subscriptions WHERE movie_code = ?", (movie_code.strip(),))
     res = cursor.fetchall()
@@ -658,7 +660,7 @@ def get_movie_subscribers(movie_code):
     return [r[0] for r in res]
 
 def get_random_movie():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT code, title, caption, genre, views, is_vip FROM movies ORDER BY RANDOM() LIMIT 1")
     res = cursor.fetchone()
@@ -686,7 +688,7 @@ def trigger_auto_backup(bot_instance):
 # ----------------- PENDING QUEUE HELPERS -----------------
 
 def add_to_pending_queue(file_id, title="", caption=""):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT COALESCE(MAX(queue_num), 0) + 1 FROM pending_queue")
     next_num = cursor.fetchone()[0]
@@ -699,7 +701,7 @@ def add_to_pending_queue(file_id, title="", caption=""):
     return next_num
 
 def get_pending_queue_count():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM pending_queue WHERE status = 'pending'")
     count = cursor.fetchone()[0]
@@ -707,7 +709,7 @@ def get_pending_queue_count():
     return count
 
 def get_next_pending_video():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT id, queue_num, file_id, title, caption FROM pending_queue WHERE status = 'pending' ORDER BY queue_num ASC LIMIT 1")
     res = cursor.fetchone()
@@ -716,14 +718,14 @@ def get_next_pending_video():
 
 
 def mark_pending_fulfilled(pending_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("UPDATE pending_queue SET status = 'fulfilled' WHERE id = ?", (pending_id,))
     conn.commit()
     conn.close()
 
 def clear_pending_queue():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM pending_queue WHERE status = 'pending'")
     conn.commit()
