@@ -1869,6 +1869,67 @@ def auto_restore_on_startup():
     except Exception as e:
         print(f"Error in auto_restore_on_startup: {e}")
 
+def auto_movie_scout_worker():
+    """Background worker that continuously fetches open-source movie metadata and auto-populates movies.db"""
+    import time
+    import urllib.request
+    import json
+
+    open_queries = [
+        "O'zbek", "Tarjima kino", "Аватар", "Брат", "Бригада", 
+        "Spider-Man", "Marvel", "Batman", "Комедия", "Мультфильм"
+    ]
+    
+    print("🤖 Auto-Movie Scout Worker started running in background...")
+    time.sleep(10)  # Wait on startup
+
+    for q in open_queries:
+        try:
+            url = f"https://api.themoviedb.org/3/search/movie?api_key=c6d1d490bb5982845c48b2eb594b29c9&query={urllib.parse.quote(q)}&language=ru-RU"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                data = json.loads(resp.read().decode())
+                results = data.get('results', [])
+
+            for item in results[:3]:
+                m_title = item.get('title') or item.get('original_title')
+                if not m_title:
+                    continue
+                
+                # Check if movie already exists
+                existing = database.search_movies_by_name(m_title)
+                if existing:
+                    continue
+
+                overview = item.get('overview', '') or "Avtomatik internetdan qidirib topilgan kino."
+                rel_year = (item.get('release_date') or '')[:4]
+                vote = item.get('vote_average', 8.0)
+
+                detected_lang = "🇺🇿 O'zbekcha" if ("O'zbek" in q or "Tarjima" in q) else "🇷🇺 Ruscha (На русском)"
+                caption_str = f"{m_title} ({rel_year})\n\n⭐ Reyting: {vote}/10\n📝 Tavsif: {overview[:300]}"
+                code = generate_unique_code()
+
+                database.add_movie(code, m_title, caption_str, "🌐 Boshqa", 0, detected_lang)
+                print(f"🤖 Auto-Scout auto-added movie: {m_title} (Code: {code})")
+
+                # Notify admins
+                for admin_id in config.ADMIN_IDS:
+                    try:
+                        bot.send_message(
+                            admin_id,
+                            f"🤖 **INTERNETDAN YANGI KINO AVTOMATIK TOPILDI VA BOTGA SAQLANDI!**\n\n"
+                            f"🎬 **Kino nomi:** {m_title} ({rel_year})\n"
+                            f"🌐 **Tili:** {detected_lang}\n"
+                            f"⭐ **Reyting:** {vote}/10\n"
+                            f"🔑 **Biriktirilgan Kod:** `{code}`",
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+                time.sleep(2)
+        except Exception as e:
+            print(f"Auto scout error: {e}")
+
 # Start polling
 if __name__ == '__main__':
     web_thread = threading.Thread(target=start_health_check_server, daemon=True)
@@ -1877,8 +1938,12 @@ if __name__ == '__main__':
     ping_thread = threading.Thread(target=keep_alive_pinger, daemon=True)
     ping_thread.start()
 
+    scout_thread = threading.Thread(target=auto_movie_scout_worker, daemon=True)
+    scout_thread.start()
+
     auto_restore_on_startup()
 
     print("Bot ishga tushmoqda...")
     bot.infinity_polling()
+
 
