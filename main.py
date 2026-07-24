@@ -2175,7 +2175,8 @@ def telethon_movie_scraper_worker():
 
             print("✅ Telethon Userbot CONNECTED and searching public Telegram channels for MP4 videos...")
 
-            # Ultra-Deep historic search in public & custom specified channels
+            # Unlimited historic search (Iterate ALL messages in specified channels!)
+            import re
             custom_target_channel = database.get_setting('telethon_target_channel')
             public_movie_channels = [
                 'kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd', 'top_kinolar'
@@ -2186,7 +2187,8 @@ def telethon_movie_scraper_worker():
             while True:
                 for ch in public_movie_channels:
                     try:
-                        async for msg in client.iter_messages(ch, limit=5000):
+                        # limit=None fetches ALL messages in channel history without any cap!
+                        async for msg in client.iter_messages(ch, limit=None):
                             if msg.video or msg.document:
                                 cap = msg.message or "Manba kino"
                                 raw_title = cap.split('\n')[0][:60] if cap else "Telegram Movie"
@@ -2195,7 +2197,15 @@ def telethon_movie_scraper_worker():
                                     clean_title = raw_title
 
                                 cap_lower = cap.lower()
-                                is_serial = ("qism" in cap_lower or "серия" in cap_lower or "сезон" in cap_lower or "#serial" in cap_lower)
+
+                                # Advanced Serial Detection Regex (1-qism, 2 qism, 1-серия, e01, s01e02, part 1, 1-qism...)
+                                serial_patterns = [
+                                    r'\d+\s*-\s*qism', r'\d+\s*qism', r'qism\s*\d+',
+                                    r'\d+\s*-\s*серия', r'\d+\s*серия', r'серия\s*\d+',
+                                    r'\d+\s*-\s*сезон', r'\d+\s*сезон', r'сезон\s*\d+',
+                                    r'e\d+', r's\d+e\d+', r'part\s*\d+', r'ep\s*\d+', r'#serial', r'serial'
+                                ]
+                                is_serial = any(re.search(pat, cap_lower) for pat in serial_patterns)
                                 type_prefix = "[📺 SERIAL] " if is_serial else ""
                                 full_title = f"{type_prefix}{clean_title}"
 
@@ -2206,12 +2216,13 @@ def telethon_movie_scraper_worker():
                                     # Send video file through bot
                                     bot_username = bot.get_me().username
                                     await client.send_file(bot_username, msg.media, caption=f"/start {code}")
-                                    print(f"🚀 Telethon Userbot AUTO-COPIED VIDEO: {full_title} (Code: {code})")
+                                    print(f"🚀 Telethon Userbot AUTO-COPIED UNLIMITED VIDEO: {full_title} (Code: {code})")
                                     await asyncio.sleep(2)
                     except Exception as ex:
                         print(f"Error scraping channel {ch}: {ex}")
                 
                 await asyncio.sleep(300)
+
 
         loop.run_until_complete(run_telethon_bot())
     except Exception as e:
