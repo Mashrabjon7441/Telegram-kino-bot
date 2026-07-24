@@ -1874,31 +1874,35 @@ def auto_movie_scout_worker():
     import time
     import urllib.request
     import json
+    import random
 
-    keywords = [
-        "Avatar", "Spider-Man", "Брат", "Бригада", "Мстители", "Джентльмены",
+    search_terms = [
+        "Аватар", "Брат", "Бригада", "Мстители", "Джентльмены",
         "Интерстеллар", "Гарри Поттер", "Форсаж", "Матрица", "Шрек", "Леон",
-        "Один дома", "Титаник", "Гладиатор", "Начало", "Джокер", "Веном", "Терминатор", "Побег из Шоушенка"
+        "Один дома", "Титаник", "Гладиатор", "Начало", "Джокер", "Веном", "Терминатор",
+        "Тачки", "Миньоны", "Сумерки", "Джон Уик", "Человек паук", "Бэтмен", "Пираты Карибского моря"
     ]
-    
-    print("🤖 Auto-Movie Scout Worker active and searching in background...")
-    time.sleep(5)  # Wait on startup
+
+    print("🤖 Auto-Movie Scout Worker started and active...")
+    time.sleep(3)
 
     while True:
-        for q in keywords:
+        random.shuffle(search_terms)
+        for term in search_terms:
             try:
-                url = f"https://api.themoviedb.org/3/search/movie?api_key=c6d1d490bb5982845c48b2eb594b29c9&query={urllib.parse.quote(q)}&language=ru-RU"
+                page = random.randint(1, 3)
+                url = f"https://api.themoviedb.org/3/search/movie?api_key=c6d1d490bb5982845c48b2eb594b29c9&query={urllib.parse.quote(term)}&language=ru-RU&page={page}"
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req, timeout=6) as resp:
                     data = json.loads(resp.read().decode())
                     results = data.get('results', [])
 
-                for item in results[:5]:
+                for item in results:
                     m_title = item.get('title') or item.get('original_title')
                     if not m_title:
                         continue
-                    
-                    # Check if movie already exists in database
+
+                    # Exact check in database
                     existing = database.search_movies_by_name(m_title)
                     if existing:
                         continue
@@ -1907,10 +1911,9 @@ def auto_movie_scout_worker():
                     rel_year = (item.get('release_date') or '')[:4]
                     vote = item.get('vote_average', 8.0)
 
-                    # Language detection logic
                     cyrillic_chars = set("абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ")
                     detected_lang = "🇷🇺 Ruscha (На русском)" if sum(1 for c in m_title if c in cyrillic_chars) > 0 else "🇺🇿 O'zbekcha"
-                    
+
                     caption_str = f"{m_title}"
                     if rel_year:
                         caption_str += f" ({rel_year})"
@@ -1919,30 +1922,29 @@ def auto_movie_scout_worker():
                     code = generate_unique_code()
 
                     database.add_movie(code, m_title, caption_str, "🌐 Boshqa", 0, detected_lang)
-                    print(f"🤖 Auto-Scout auto-added movie: {m_title} (Code: {code})")
+                    print(f"🤖 Auto-Scout auto-added: {m_title} (Code: {code})")
 
-                    # Notify admins instantly
+                    # Immediate alert to Super Admins
+                    alert_text = (
+                        f"🤖 **INTERNETDAN YANGI KINO AVTOMATIK TOPILDI VA BOTGA QO'SHILDI!**\n\n"
+                        f"🎬 **Kino nomi:** {m_title} {f'({rel_year})' if rel_year else ''}\n"
+                        f"🌐 **Tili:** {detected_lang}\n"
+                        f"⭐ **Reyting:** {vote}/10\n"
+                        f"🔑 **Biriktirilgan Kod:** `{code}`\n\n"
+                        f"*(Foydalanuvchilar botga `{code}` kodi yuborib tomosha qilishlari mumkin)*"
+                    )
                     for admin_id in config.ADMIN_IDS:
                         try:
-                            bot.send_message(
-                                admin_id,
-                                f"🤖 **INTERNETDAN YANGI KINO AVTOMATIK TOPILDI VA BOTGA QO'SHILDI!**\n\n"
-                                f"🎬 **Kino nomi:** {m_title} {f'({rel_year})' if rel_year else ''}\n"
-                                f"🌐 **Tili:** {detected_lang}\n"
-                                f"⭐ **Reyting:** {vote}/10\n"
-                                f"🔑 **Biriktirilgan Kod:** `{code}`\n\n"
-                                f"*(Foydalanuvchilar `{code}` kodi orqali qidirishlari mumkin)*",
-                                parse_mode="Markdown"
-                            )
-                        except Exception as err:
-                            print(f"Failed to send admin scout notice: {err}")
-                    
-                    time.sleep(3)
-            except Exception as e:
-                print(f"Auto scout loop error: {e}")
+                            bot.send_message(admin_id, alert_text, parse_mode="Markdown")
+                        except Exception as e:
+                            print(f"Scout notification error to {admin_id}: {e}")
 
-        # Sleep 5 minutes before restarting next background sweep cycle
-        time.sleep(300)
+                    time.sleep(2)
+            except Exception as err:
+                print(f"Scout term error for '{term}': {err}")
+
+        time.sleep(60)
+
 
 
 # Start polling
