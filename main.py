@@ -2152,7 +2152,7 @@ def telethon_movie_scraper_worker():
 
             print("✅ Telethon Userbot CONNECTED and searching public Telegram channels for MP4 videos...")
 
-            # Deep historic search in public channels for both old & new movies (Up to 500 historic messages per channel!)
+            # Ultra-Deep historic search in public channels for both old & new movies (Up to 5,000 historic messages per channel!)
             public_movie_channels = [
                 'kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd', 'top_kinolar'
             ]
@@ -2160,7 +2160,7 @@ def telethon_movie_scraper_worker():
             while True:
                 for ch in public_movie_channels:
                     try:
-                        async for msg in client.iter_messages(ch, limit=500):
+                        async for msg in client.iter_messages(ch, limit=5000):
                             if msg.video or msg.document:
                                 cap = msg.message or "Manba kinolar"
                                 title = cap.split('\n')[0][:50] if cap else "Telegram Movie"
@@ -2178,6 +2178,7 @@ def telethon_movie_scraper_worker():
                         print(f"Error scraping channel {ch}: {ex}")
                 
                 await asyncio.sleep(300)
+
 
         loop.run_until_complete(run_telethon_bot())
     except Exception as e:
