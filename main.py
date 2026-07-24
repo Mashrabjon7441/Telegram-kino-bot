@@ -2152,32 +2152,37 @@ def telethon_movie_scraper_worker():
 
             print("✅ Telethon Userbot CONNECTED and searching public Telegram channels for MP4 videos...")
 
-            # Search public channels for movies
+            # Deep historic search in public channels for both old & new movies (Up to 500 historic messages per channel!)
             public_movie_channels = [
-                'kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd'
+                'kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd', 'top_kinolar'
             ]
 
-            for ch in public_movie_channels:
-                try:
-                    async for msg in client.iter_messages(ch, limit=10):
-                        if msg.video or msg.document:
-                            cap = msg.message or "Manba kinolar"
-                            title = cap.split('\n')[0][:50] if cap else "Telegram Movie"
-                            
-                            if not database.movie_exists_by_exact_title(title):
-                                code = generate_unique_code()
-                                database.add_movie(code, title, cap, "🌐 Boshqa", 0, "🇺🇿 O'zbekcha")
+            while True:
+                for ch in public_movie_channels:
+                    try:
+                        async for msg in client.iter_messages(ch, limit=500):
+                            if msg.video or msg.document:
+                                cap = msg.message or "Manba kinolar"
+                                title = cap.split('\n')[0][:50] if cap else "Telegram Movie"
                                 
-                                # Send video file through bot
-                                bot_username = bot.get_me().username
-                                await client.send_file(bot_username, msg.media, caption=f"/start {code}")
-                                print(f"🚀 Telethon Userbot AUTO-COPIED REAL VIDEO: {title} (Code: {code})")
-                except Exception as ex:
-                    print(f"Error scraping channel {ch}: {ex}")
+                                if not database.movie_exists_by_exact_title(title):
+                                    code = generate_unique_code()
+                                    database.add_movie(code, title, cap, "🌐 Boshqa", 0, "🇺🇿 O'zbekcha")
+                                    
+                                    # Send video file through bot
+                                    bot_username = bot.get_me().username
+                                    await client.send_file(bot_username, msg.media, caption=f"/start {code}")
+                                    print(f"🚀 Telethon Userbot AUTO-COPIED HISTORIC VIDEO: {title} (Code: {code})")
+                                    await asyncio.sleep(2)
+                    except Exception as ex:
+                        print(f"Error scraping channel {ch}: {ex}")
+                
+                await asyncio.sleep(300)
 
         loop.run_until_complete(run_telethon_bot())
     except Exception as e:
         print(f"Telethon worker error: {e}")
+
 
 # Start polling
 if __name__ == '__main__':
