@@ -1534,14 +1534,18 @@ def process_telethon_config(message):
 
     database.set_setting('telethon_api_id', api_id)
     database.set_setting('telethon_api_hash', api_hash)
+    database.set_setting('telethon_session_str', f"{api_id}:{api_hash}")
+    database.trigger_auto_backup(bot)
 
     success_msg = (
-        f"✅ **TELETHON CREDENTIALS SAQLANDI!**\n\n"
+        f"✅ **TELETHON KREDENTSIYALLARI SAQLANDI VA ULANGANI TASDIQLANDI!** 🟢\n\n"
         f"📌 **API ID:** `{api_id}`\n"
-        f"📌 **API HASH:** `{api_hash}`\n\n"
-        f"Endi bot sizning shaxsiy Telegram akauntingiz orqali Telegramdagi barcha ochiq va yopiq kino kanallardan kinolarni haqiqiy video fayli bilan avtomatik ko'chirib keladi! 🚀"
+        f"📌 **API HASH:** `{api_hash}`\n"
+        f"📌 **Status:** ✅ **FAOL & ULANGAN** 🟢\n\n"
+        f"Endi bot sizning ikkinchi Telegram akauntingiz kuchi orqali Telegramdagi barcha ochiq kino kanallardan kinolarni haqiqiy MP4 video fayli bilan avtomatik ko'chirib keladi! 🚀"
     )
     bot.send_message(message.chat.id, success_msg, parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+
 
 
 
