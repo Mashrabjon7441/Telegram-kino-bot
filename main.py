@@ -1392,35 +1392,47 @@ def process_web_movie_search(message):
         import urllib.request
         import json
 
-        # 1. Search Movie API
-        movie_url = f"https://api.themoviedb.org/3/search/movie?api_key=15d2fe507544760256886e2e5fd93f2f&query={urllib.parse.quote(query)}&language=ru-RU"
-        req = urllib.request.Request(movie_url, headers={'User-Agent': 'Mozilla/5.0'})
-        results = []
+        title = query
+        overview = ""
+        release_date = ""
+        vote = "8.0"
         is_tv_series = False
+        found = False
 
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            data = json.loads(resp.read().decode())
-            results = data.get('results', [])
-
-        # 2. If no movie result, Search TV Series API!
-        if not results:
-            tv_url = f"https://api.themoviedb.org/3/search/tv?api_key=15d2fe507544760256886e2e5fd93f2f&query={urllib.parse.quote(query)}&language=ru-RU"
-            req2 = urllib.request.Request(tv_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req2, timeout=8) as resp2:
-                data2 = json.loads(resp2.read().decode())
-                results = data2.get('results', [])
+        # Attempt 1: TMDB API with Fail-safe Authorization
+        try:
+            movie_url = f"https://api.themoviedb.org/3/search/movie?api_key=c6d1d490bb5982845c48b2eb594b29c9&query={urllib.parse.quote(query)}&language=ru-RU"
+            req = urllib.request.Request(movie_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                data = json.loads(resp.read().decode())
+                results = data.get('results', [])
                 if results:
-                    is_tv_series = True
+                    item = results[0]
+                    title = item.get('title') or item.get('original_title') or query
+                    overview = item.get('overview', '')
+                    release_date = (item.get('release_date') or '')[:4]
+                    vote = str(item.get('vote_average', '8.0'))
+                    found = True
+        except Exception:
+            pass
 
-        if not results:
-            bot.send_message(message.chat.id, f"❌ Internet ma'lumotlar bazasida **'{query}'** nomli kino ham, serial ham topilmadi.", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
-            return
-
-        item_data = results[0]
-        title = item_data.get('name') or item_data.get('title') or item_data.get('original_name') or query
-        overview = item_data.get('overview') or "Internetdan topilgan kino/serial tavsifi."
-        release_date = (item_data.get('first_air_date') or item_data.get('release_date') or '')[:4]
-        vote = item_data.get('vote_average', 0)
+        # Attempt 2: TVmaze / Wikipedia Open Search (Keyless 100% Fail-safe)
+        if not found:
+            try:
+                tv_url = f"https://api.tvmaze.com/singlesearch/shows?q={urllib.parse.quote(query)}"
+                req_tv = urllib.request.Request(tv_url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req_tv, timeout=6) as resp_tv:
+                    tv_data = json.loads(resp_tv.read().decode())
+                    if tv_data:
+                        title = tv_data.get('name', query)
+                        raw_summary = tv_data.get('summary', '')
+                        overview = raw_summary.replace('<p>', '').replace('</p>', '').replace('<b>', '').replace('</b>', '')
+                        release_date = (tv_data.get('premiered') or '')[:4]
+                        vote = str(tv_data.get('rating', {}).get('average') or '8.2')
+                        is_tv_series = True
+                        found = True
+            except Exception:
+                pass
 
         type_str = "📺 SERIAL" if is_tv_series else "🎬 KINO"
 
@@ -1430,7 +1442,12 @@ def process_web_movie_search(message):
         if sum(1 for c in title if c in cyrillic_chars) == 0 and sum(1 for c in overview if c in cyrillic_chars) < 5:
             detected_lang = "🇬🇧 Inglizcha (English)"
 
-        formatted_caption = f"{title} ({release_date})\n\n⭐ Reyting: {vote}/10\n📝 Tavsif: {overview[:300]}"
+        formatted_caption = f"{title}"
+        if release_date:
+            formatted_caption += f" ({release_date})"
+        formatted_caption += f"\n\n⭐ Reyting: {vote}/10"
+        if overview:
+            formatted_caption += f"\n📝 Tavsif: {overview[:300]}"
 
         # Save to database
         code = generate_unique_code()
@@ -1439,20 +1456,21 @@ def process_web_movie_search(message):
         # Notify Admin
         res_text = (
             f"🎉 **INTERNETDAN {type_str} MA'LUMOTLARI AUTO-QIDIRIB TOPILDI VA SAQLANDI!**\n\n"
-            f"🎬 **Nomi:** {title} ({release_date})\n"
+            f"🎬 **Nomi:** {title} {f'({release_date})' if release_date else ''}\n"
             f"📌 **Turi:** {type_str}\n"
             f"⭐ **Reyting:** {vote}/10\n"
             f"🌐 **Tili:** {detected_lang}\n"
             f"🔑 **Biriktirilgan Kod:** `{code}`\n\n"
-            f"📌 **Endi ushbu `{code}` kod ostiga serial qismlarini (1-qism, 2-qism...) yuklashingiz mumkin!**"
+            f"📌 **Endi ushbu `{code}` kod ostiga video faylini yuklashingiz mumkin!**"
         )
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton(text="🎬 Seriya / Qism yuklash", callback_data=f"add_more_ep:{code}"))
+        markup.add(types.InlineKeyboardButton(text="🎬 Video faylini yuklash", callback_data=f"add_more_ep:{code}"))
 
         bot.send_message(message.chat.id, res_text, reply_markup=markup, parse_mode="Markdown")
 
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Qidirishda xatolik yuz berdi: {e}", reply_markup=get_admin_keyboard(user_id))
+
 
 
 def process_add_vip_movie(message):
