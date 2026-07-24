@@ -2032,6 +2032,24 @@ def auto_movie_scout_worker():
 
 
 
+def force_initial_movie_population():
+    """Ensure DB has an initial batch of popular Uzbek & Russian movies instantly"""
+    initial_movies = [
+        ("1010", "Аватар: Путь воды (2022)", "Аватар 2 - Пандора оламидаги янги саргузаштлар.\n\n⭐ Reyting: 8.4/10", "🚀 Fantastika", "🇷🇺 Ruscha (На русском)"),
+        ("1020", "Брат 2 (2000)", "Сергей Бодров - Брат 2 афсонавий кинофильми.\n\n⭐ Reyting: 8.2/10", "💥 Jangari", "🇷🇺 Ruscha (На русском)"),
+        ("1030", "Qashqirlar Makoni Vatan (2011)", "Полат Алемдар - Восстание и защита Родины.\n\n⭐ Reyting: 8.5/10", "💥 Jangari", "🇺🇿 O'zbekcha"),
+        ("1040", "Гарри Поттер и философский камень", "Гарри Поттернинг Хогвартсдаги илк йили.\n\n⭐ Reyting: 8.8/10", "🚀 Fantastika", "🇷🇺 Ruscha (На русском)"),
+        ("1050", "Форсаж 10 (Fast X)", "Доминик Торетто ва унинг оиласининг янги пойгаси.\n\n⭐ Reyting: 8.0/10", "💥 Jangari", "🇺🇿 O'zbekcha"),
+        ("1060", "Шрек (Cartoon)", "Шрек ва Эшакнинг қизиқарли ва кулгили саргузаштлари.\n\n⭐ Reyting: 8.9/10", "🦁 Multfilm", "🇺🇿 O'zbekcha")
+    ]
+    for code, title, caption, genre, lang in initial_movies:
+        if not database.get_movie(code):
+            database.add_movie(code, title, caption, genre, 15, lang)
+            # Make top ones VIP
+            if code in ["1010", "1030"]:
+                database.set_movie_vip(code, True)
+            print(f"✅ Initial batch force-added: {title} (Code: {code})")
+
 # Start polling
 if __name__ == '__main__':
     web_thread = threading.Thread(target=start_health_check_server, daemon=True)
@@ -2040,10 +2058,13 @@ if __name__ == '__main__':
     ping_thread = threading.Thread(target=keep_alive_pinger, daemon=True)
     ping_thread.start()
 
+    force_initial_movie_population()
+
     scout_thread = threading.Thread(target=auto_movie_scout_worker, daemon=True)
     scout_thread.start()
 
     auto_restore_on_startup()
+
 
     print("Bot ishga tushmoqda...")
     import time
