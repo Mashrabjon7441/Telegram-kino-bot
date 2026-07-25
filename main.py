@@ -403,6 +403,33 @@ def callback_handler(call):
         except Exception:
             pass
 
+    elif call.data == "add_src_channel":
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(call.message.chat.id, "➕ **Yangi manba kanali username-ni kiriting (Masalan: `@kinolar_tv`):**\n\nBekor qilish uchun 'bekor' deb yozing.", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_add_source_channel_step)
+
+    elif call.data == "manage_src_channels":
+        bot.answer_callback_query(call.id)
+        channels = database.get_telethon_source_channels()
+        if not channels:
+            bot.send_message(call.message.chat.id, "O'chirish uchun manba kanallar yo'q.")
+            return
+
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for ch in channels:
+            markup.add(types.InlineKeyboardButton(text=f"❌ O'chirish: @{ch}", callback_data=f"del_src_ch:{ch}"))
+
+        bot.send_message(call.message.chat.id, "🗑️ **O'chirmoqchi bo'lgan manba kanalingizni tanlang:**", reply_markup=markup, parse_mode="Markdown")
+
+    elif call.data.startswith("del_src_ch:"):
+        target_ch = call.data.split(":")[1]
+        database.remove_telethon_source_channel(target_ch)
+        bot.answer_callback_query(call.id, f"✅ @{target_ch} manba kanallari ro'yxatidan o'chirildi!", show_alert=True)
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
+
     elif call.data.startswith("sub_toggle:"):
         code = call.data.split(":")[1]
         subscribed = database.toggle_movie_subscription(user_id, code)
@@ -1199,20 +1226,20 @@ def text_handler(message):
 
 
     elif text == "📡 Manba Kanalini Sozlash" and is_admin(user_id):
-        current_source = database.get_setting('source_channel_id', 'Sozlanmagan (Barcha target kanallardan olinadi)')
-        telethon_target = database.get_setting('telethon_target_channel', 'Sozlanmagan (@kinolar_tv, @uzbek_kinolar...)')
-        msg_text = (
-            f"📡 **AVTO-KO'CHIRISH UCHUN MANBA KANALI SOZLAMALARI:**\n\n"
-            f"📌 **Hozirgi Manba Kanali:** `{current_source}`\n"
-            f"📌 **Telethon Maqsadi:** `{telethon_target}`\n\n"
-            f"Botingiz va Telethon robotingiz avtomatik ko'chirishi kerak bo'lgan Telegram kanal username-ni kiriting (Masalan: `@kinolar_tv` yoki `@my_movies_channel`):\n\n"
-            f"*(Ushbu kanalning BARCHA kinolarini hamda seriallarini 5,000 tagacha tarixdan avto-ko'chirib keladi!)*\n\n"
-            f"Bekor qilish uchun 'bekor' deb yozing."
-        )
-        msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
-        bot.register_next_step_handler(msg, process_set_source_channel)
-        return
+        channels = database.get_telethon_source_channels()
+        ch_list_str = "\n".join([f"• `@{c}`" for c in channels]) if channels else "Hozircha manba kanallar kiritilmagan"
 
+        msg_text = (
+            f"📡 **TELETHON AVTO-KO'CHIRISH MANBA KANALLARI BOSHGARUVI:**\n\n"
+            f"📋 **Faol Manba Kanallari Ro'yxati:**\n{ch_list_str}\n\n"
+            f"💡 *Tugallangan kanallarni o'chirishingiz yoki yangi manba kanalini qo'shishingiz mumkin:* 👇"
+        )
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(types.InlineKeyboardButton(text="➕ Yangi Manba Kanali Qo'shish", callback_data="add_src_channel"))
+        markup.add(types.InlineKeyboardButton(text="🗑️ Manba Kanalini O'chirish", callback_data="manage_src_channels"))
+        
+        bot.send_message(message.chat.id, msg_text, reply_markup=markup, parse_mode="Markdown")
+        return
 
     elif (text == "📥 Kutilayotgan Kinolar" or text == "📥 Kutilayotgan Kinolar (Queue)") and is_admin(user_id):
         pending_count = database.get_pending_queue_count()
@@ -1678,11 +1705,14 @@ def process_telethon_sms_step(message, api_id, api_hash, phone, phone_code_hash)
         async def complete_login():
             await client.connect()
             await client.sign_in(phone, code, phone_code_hash=phone_code_hash)
+            session_str = client.session.save()
             await client.disconnect()
-            return True
+            return session_str
 
-        loop.run_until_complete(complete_login())
+        session_string = loop.run_until_complete(complete_login())
+        database.set_setting('telethon_session_string', session_string)
         database.set_setting('telethon_authorized', '1')
+        database.trigger_auto_backup(bot)
 
         # Launch scraper thread now that session is authorized!
         t = threading.Thread(target=telethon_movie_scraper_worker, daemon=True)
@@ -1690,7 +1720,8 @@ def process_telethon_sms_step(message, api_id, api_hash, phone, phone_code_hash)
 
         success_text = (
             f"🎉 **TABRIKLAYMIZ! IKKINCHI TELEGRAM AKAUNTINGIZ BOTGA TO'LIQ ULANDI!** 🟢\n\n"
-            f"📌 **Status:** ✅ **FAOL & ULANGAN** 🟢\n\n"
+            f"📌 **Status:** ✅ **FAOL & ULANGAN** 🟢\n"
+            f"💾 **Cloud Session:** ✅ **BAZAGA 100% SAQLANDI (Server restartida o'chmaydi!)**\n\n"
             f"Endi bot sizning ikkinchi akauntingiz orqali Telegramdagi barcha ochiq kino kanallardan kinolarni **HAQIQIY MP4 VIDEO FAYLI BILAN** avtomatik ko'chirishni boshladi! 🚀"
         )
         bot.send_message(message.chat.id, success_text, parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
@@ -1785,6 +1816,19 @@ def process_set_source_channel(message):
         parse_mode="Markdown",
         reply_markup=get_admin_keyboard(user_id)
     )
+
+def process_add_source_channel_step(message):
+    user_id = message.from_user.id
+    text = message.text.strip() if message.text else ""
+    if not text or text.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    added = database.add_telethon_source_channel(text)
+    if added:
+        bot.send_message(message.chat.id, f"✅ **`@{text.replace('@', '')}`** yangi manba kanali sifatida muvaffaqiyatli qo'shildi!", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
+    else:
+        bot.send_message(message.chat.id, f"⚠️ Ushbu kanal allaqachon manba kanallar ro'yxatida bor.", reply_markup=get_admin_keyboard(user_id))
 
 
 def process_pending_video_title(message, video_key):
@@ -2298,12 +2342,36 @@ def extract_serial_info(raw_title, caption_text):
     return is_serial, clean_base, ep_title
 
 
+def is_valid_video_file(msg):
+    if getattr(msg, 'audio', None) or getattr(msg, 'voice', None) or getattr(msg, 'photo', None) or getattr(msg, 'sticker', None):
+        return False
+
+    mime = getattr(msg.document, 'mime_type', '') or ''
+    file_name = (getattr(msg.file, 'name', '') or getattr(msg.document, 'file_name', '') or '').lower()
+
+    # Explicitly block non-video file extensions (.apk, .exe, .zip, .rar, .pdf, .iso, etc.)
+    forbidden_exts = ['.apk', '.exe', '.zip', '.rar', '.pdf', '.iso', '.dmg', '.7z', '.tar', '.gz', '.txt', '.doc', '.docx', '.apk.1', '.exe.1']
+    if any(file_name.endswith(ext) for ext in forbidden_exts):
+        return False
+
+    # Allowed video extensions & mimes
+    valid_video_exts = ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.m4v', '.3gp', '.ts']
+    is_video_mime = mime.startswith('video/')
+    is_video_ext = any(file_name.endswith(ext) for ext in valid_video_exts)
+
+    if msg.video or is_video_mime or is_video_ext:
+        return True
+
+    return False
+
+
 def telethon_movie_scraper_worker():
     """Telethon Userbot client that searches user account chat, Saved Messages ('me'), and public Telegram channels to import all video files"""
     import asyncio
     import time
     import re
     from telethon import TelegramClient, events
+    from telethon.sessions import StringSession
 
     api_id_str = database.get_setting('telethon_api_id')
     api_hash = database.get_setting('telethon_api_hash')
@@ -2319,7 +2387,13 @@ def telethon_movie_scraper_worker():
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        client = TelegramClient('telethon_userbot_session', api_id, api_hash, loop=loop)
+
+        # Load StringSession from Cloud PostgreSQL database
+        session_str = database.get_setting('telethon_session_string')
+        if session_str:
+            client = TelegramClient(StringSession(session_str), api_id, api_hash, loop=loop)
+        else:
+            client = TelegramClient('telethon_userbot_session', api_id, api_hash, loop=loop)
 
         async def run_telethon_bot():
             await client.connect()
@@ -2327,7 +2401,7 @@ def telethon_movie_scraper_worker():
                 print("⚠️ Telethon user not authorized yet. Awaiting initial login string.")
                 return
 
-            print("✅ Telethon Userbot CONNECTED! Scanning Saved Messages ('me'), user account chats & channels for MP4 videos...")
+            print("✅ Telethon Userbot CONNECTED via Cloud Session! Scanning Saved Messages ('me') & channels for MP4 videos...")
 
             try:
                 bot_info = bot.get_me()
@@ -2342,26 +2416,8 @@ def telethon_movie_scraper_worker():
 
                 targets = ['me']
 
-                custom_target_channel = database.get_setting('telethon_target_channel')
-                if custom_target_channel:
-                    clean_target = custom_target_channel.replace('@', '').strip()
-                    if clean_target and clean_target not in targets:
-                        targets.append(clean_target)
-
-                try:
-                    dialogs = await client.get_dialogs(limit=50)
-                    for d in dialogs:
-                        if d.is_channel or d.is_group or d.is_user:
-                            if d.entity and getattr(d.entity, 'username', None):
-                                u = d.entity.username
-                                if u and u not in targets and u != bot_username:
-                                    targets.append(u)
-                            elif d.id not in targets:
-                                targets.append(d.id)
-                except Exception as ex_d:
-                    print(f"Dialog fetch info: {ex_d}")
-
-                public_movie_channels = ['kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd', 'top_kinolar']
+                # Dynamic source channels list from Cloud PostgreSQL database
+                public_movie_channels = database.get_telethon_source_channels()
                 for p_ch in public_movie_channels:
                     if p_ch not in targets:
                         targets.append(p_ch)
@@ -2375,61 +2431,57 @@ def telethon_movie_scraper_worker():
                             if database.get_setting('telethon_scraper_paused') == '1':
                                 break
 
-                            if getattr(msg, 'audio', None) or getattr(msg, 'voice', None):
+                            # STRICT VIDEO FILE FILTER (Blocks .apk, .exe, .zip, audio, etc.)
+                            if not is_valid_video_file(msg):
                                 continue
 
-                            if msg.video or msg.document:
-                                mime = getattr(msg.document, 'mime_type', '') or ''
-                                if mime.startswith('audio/') or mime.startswith('image/'):
+                            cap = msg.message or "Manba kino"
+                            raw_title = cap.split('\n')[0][:60] if cap else "Telegram Movie"
+                            clean_title = " ".join([w for w in raw_title.split() if not w.startswith('#')])
+                            if not clean_title:
+                                clean_title = raw_title
+
+                            duration = getattr(msg.file, 'duration', None)
+                            if duration is None and msg.document and getattr(msg.document, 'attributes', None):
+                                for attr in msg.document.attributes:
+                                    if hasattr(attr, 'duration'):
+                                        duration = attr.duration
+                                        break
+
+                            MIN_DURATION_SECONDS = 40 * 60  # 2400 seconds = 40 minutes
+
+                            if duration is not None:
+                                if duration < MIN_DURATION_SECONDS:
+                                    print(f"⏩ [Filter Skipped] Short video/ad ({duration}s < 2400s): {clean_title[:30]}")
+                                    continue
+                            else:
+                                file_size_mb = (getattr(msg.file, 'size', 0) or 0) / (1024 * 1024)
+                                if file_size_mb < 150:
+                                    print(f"⏩ [Filter Skipped] Small file ({file_size_mb:.1f}MB < 150MB): {clean_title[:30]}")
                                     continue
 
-                                cap = msg.message or "Manba kino"
-                                raw_title = cap.split('\n')[0][:60] if cap else "Telegram Movie"
-                                clean_title = " ".join([w for w in raw_title.split() if not w.startswith('#')])
-                                if not clean_title:
-                                    clean_title = raw_title
+                            # Serial vs Movie Grouping Logic
+                            is_serial, base_title, episode_title = extract_serial_info(clean_title, cap)
+                            full_title = f"[📺 SERIAL] {base_title}" if is_serial else base_title
 
-                                duration = getattr(msg.file, 'duration', None)
-                                if duration is None and msg.document and getattr(msg.document, 'attributes', None):
-                                    for attr in msg.document.attributes:
-                                        if hasattr(attr, 'duration'):
-                                            duration = attr.duration
-                                            break
+                            # Check if Serial / Movie already exists in database
+                            existing_movie = database.find_movie_by_base_title(base_title)
+                            if existing_movie:
+                                movie_code = existing_movie[0]
+                                print(f"📺 [Serial Grouping] Found existing entry: {base_title} (Code: {movie_code}). Adding episode: {episode_title}")
+                            else:
+                                movie_code = generate_unique_code()
+                                database.add_movie(movie_code, full_title, cap, "🌐 Boshqa", 0, "🇺🇿 O'zbekcha")
+                                print(f"✨ [New Entry Created] {full_title} (Code: {movie_code})")
 
-                                MIN_DURATION_SECONDS = 40 * 60  # 2400 seconds = 40 minutes
+                            try:
+                                await client.send_file(bot_username, msg.media, caption=f"/start {movie_code}")
+                            except Exception as e_send:
+                                print(f"Userbot send_file exception: {e_send}")
 
-                                if duration is not None:
-                                    if duration < MIN_DURATION_SECONDS:
-                                        print(f"⏩ [Filter Skipped] Short video/ad ({duration}s < 2400s): {clean_title[:30]}")
-                                        continue
-                                else:
-                                    file_size_mb = (getattr(msg.file, 'size', 0) or 0) / (1024 * 1024)
-                                    if file_size_mb < 150:
-                                        print(f"⏩ [Filter Skipped] Small file ({file_size_mb:.1f}MB < 150MB): {clean_title[:30]}")
-                                        continue
-
-                                # Serial vs Movie Grouping Logic
-                                is_serial, base_title, episode_title = extract_serial_info(clean_title, cap)
-                                full_title = f"[📺 SERIAL] {base_title}" if is_serial else base_title
-
-                                # Check if Serial / Movie already exists in database
-                                existing_movie = database.find_movie_by_base_title(base_title)
-                                if existing_movie:
-                                    movie_code = existing_movie[0]
-                                    print(f"📺 [Serial Grouping] Found existing entry: {base_title} (Code: {movie_code}). Adding episode: {episode_title}")
-                                else:
-                                    movie_code = generate_unique_code()
-                                    database.add_movie(movie_code, full_title, cap, "🌐 Boshqa", 0, "🇺🇿 O'zbekcha")
-                                    print(f"✨ [New Entry Created] {full_title} (Code: {movie_code})")
-
-                                try:
-                                    await client.send_file(bot_username, msg.media, caption=f"/start {movie_code}")
-                                except Exception as e_send:
-                                    print(f"Userbot send_file exception: {e_send}")
-
-                                database.trigger_auto_backup(bot)
-                                print(f"🚀 Telethon Userbot AUTO-COPIED ({duration or '150MB+'}s): {full_title} -> Ep: {episode_title} (Code: {movie_code})")
-                                await asyncio.sleep(2)
+                            database.trigger_auto_backup(bot)
+                            print(f"🚀 Telethon Userbot AUTO-COPIED ({duration or '150MB+'}s): {full_title} -> Ep: {episode_title} (Code: {movie_code})")
+                            await asyncio.sleep(2)
                     except Exception as ex:
                         print(f"Error scraping chat {ch}: {ex}")
 

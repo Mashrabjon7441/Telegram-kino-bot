@@ -1231,11 +1231,37 @@ def mark_pending_fulfilled(pending_id):
     conn.close()
 
 def clear_pending_queue():
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM pending_queue WHERE status = 'pending'")
-    conn.commit()
-    conn.close()
+    execute_query("DELETE FROM pending_queue WHERE status = 'pending'")
+
+# ----------------- TELETHON SOURCE CHANNELS HELPERS -----------------
+
+def get_telethon_source_channels():
+    val = get_setting('telethon_source_channels')
+    if not val:
+        default_list = ['kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd', 'top_kinolar']
+        set_setting('telethon_source_channels', ",".join(default_list))
+        return default_list
+    return [ch.strip() for ch in val.split(',') if ch.strip()]
+
+def add_telethon_source_channel(channel_username):
+    clean = channel_username.replace('@', '').strip()
+    if not clean:
+        return False
+    current = get_telethon_source_channels()
+    if clean not in current:
+        current.append(clean)
+        set_setting('telethon_source_channels', ",".join(current))
+        return True
+    return False
+
+def remove_telethon_source_channel(channel_username):
+    clean = channel_username.replace('@', '').strip()
+    current = get_telethon_source_channels()
+    if clean in current:
+        current.remove(clean)
+        set_setting('telethon_source_channels', ",".join(current))
+        return True
+    return False
 
 
 
