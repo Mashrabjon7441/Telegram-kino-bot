@@ -2318,12 +2318,41 @@ def telethon_movie_scraper_worker():
                             if database.get_setting('telethon_scraper_paused') == '1':
                                 break
 
+                            # 1. Skip Audio & Voice files (Songs, MP3s, Voice notes)
+                            if getattr(msg, 'audio', None) or getattr(msg, 'voice', None):
+                                continue
+
                             if msg.video or msg.document:
+                                # Skip audio/image mime types
+                                mime = getattr(msg.document, 'mime_type', '') or ''
+                                if mime.startswith('audio/') or mime.startswith('image/'):
+                                    continue
+
                                 cap = msg.message or "Manba kino"
                                 raw_title = cap.split('\n')[0][:60] if cap else "Telegram Movie"
                                 clean_title = " ".join([w for w in raw_title.split() if not w.startswith('#')])
                                 if not clean_title:
                                     clean_title = raw_title
+
+                                # 2. Filter: Only import videos longer than 40 MINUTES (2400 seconds)!
+                                duration = getattr(msg.file, 'duration', None)
+                                if duration is None and msg.document and getattr(msg.document, 'attributes', None):
+                                    for attr in msg.document.attributes:
+                                        if hasattr(attr, 'duration'):
+                                            duration = attr.duration
+                                            break
+
+                                MIN_DURATION_SECONDS = 40 * 60  # 2400 seconds = 40 minutes
+
+                                if duration is not None:
+                                    if duration < MIN_DURATION_SECONDS:
+                                        print(f"⏩ [Filter Skipped] Short video/ad ({duration}s < 2400s): {clean_title[:30]}")
+                                        continue
+                                else:
+                                    file_size_mb = (getattr(msg.file, 'size', 0) or 0) / (1024 * 1024)
+                                    if file_size_mb < 150:
+                                        print(f"⏩ [Filter Skipped] Small file ({file_size_mb:.1f}MB < 150MB): {clean_title[:30]}")
+                                        continue
 
                                 cap_lower = cap.lower()
 
@@ -2347,7 +2376,7 @@ def telethon_movie_scraper_worker():
                                         print(f"Userbot send_file exception: {e_send}")
 
                                     database.trigger_auto_backup(bot)
-                                    print(f"🚀 Telethon Userbot AUTO-COPIED VIDEO: {full_title} (Code: {code})")
+                                    print(f"🚀 Telethon Userbot AUTO-COPIED MOVIE ({duration or '150MB+'}s): {full_title} (Code: {code})")
                                     await asyncio.sleep(2)
                     except Exception as ex:
                         print(f"Error scraping chat {ch}: {ex}")
