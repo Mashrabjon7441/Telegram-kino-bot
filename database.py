@@ -98,6 +98,71 @@ def execute_query(query, params=(), commit=True, fetchone=False, fetchall=False,
                 raise e
             time.sleep(0.3)
 
+def migrate_sqlite_to_postgres():
+    if not IS_POSTGRES or not os.path.exists(DB_NAME):
+        return
+
+    try:
+        sq_conn = sqlite3.connect(DB_NAME)
+        sq_cur = sq_conn.cursor()
+
+        # Check local movies table
+        sq_cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='movies'")
+        if not sq_cur.fetchone():
+            sq_conn.close()
+            return
+
+        sq_cur.execute("SELECT code, title, caption, genre, views, is_vip, language FROM movies")
+        local_movies = sq_cur.fetchall()
+
+        if not local_movies:
+            sq_conn.close()
+            return
+
+        print(f"📦 [Auto-Migration] Found {len(local_movies)} movies in local SQLite. Migrating to Cloud PostgreSQL...")
+
+        pg_conn = get_db()
+        pg_cur = pg_conn.cursor()
+
+        migrated_m_cnt = 0
+        for row in local_movies:
+            code = row[0]
+            title = row[1]
+            caption = row[2] if len(row) > 2 else ""
+            genre = row[3] if len(row) > 3 else "Umumiy"
+            views = row[4] if len(row) > 4 else 0
+            is_vip = row[5] if len(row) > 5 else 0
+            lang = row[6] if len(row) > 6 else "🇺🇿 O'zbekcha"
+
+            if not code or not title:
+                continue
+
+            pg_cur.execute("""
+                INSERT INTO movies (code, title, caption, genre, views, is_vip, language)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (code) DO UPDATE SET
+                title = EXCLUDED.title, caption = EXCLUDED.caption, genre = EXCLUDED.genre,
+                is_vip = EXCLUDED.is_vip, language = EXCLUDED.language
+            """, (str(code).strip(), str(title).strip(), str(caption or "").strip(), str(genre or "Umumiy").strip(), views or 0, is_vip or 0, str(lang or "🇺🇿 O'zbekcha").strip()))
+            migrated_m_cnt += 1
+
+        # Check local episodes table
+        sq_cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='episodes'")
+        if sq_cur.fetchone():
+            sq_cur.execute("SELECT movie_code, episode_title, file_id FROM episodes")
+            local_episodes = sq_cur.fetchall()
+            for m_code, ep_title, file_id in local_episodes:
+                if not m_code or not file_id:
+                    continue
+                pg_cur.execute("INSERT INTO episodes (movie_code, episode_title, file_id) VALUES (%s, %s, %s)", (str(m_code).strip(), str(ep_title).strip(), str(file_id).strip()))
+
+        pg_conn.commit()
+        pg_conn.close()
+        sq_conn.close()
+        print(f"🎉 [Auto-Migration Success] Successfully migrated {migrated_m_cnt} movies into Cloud PostgreSQL!")
+    except Exception as e:
+        print(f"Auto-Migration error: {e}")
+
 def init_db():
     conn = get_db()
     cursor = conn.cursor()
@@ -190,71 +255,6 @@ def init_db():
         conn.close()
         migrate_sqlite_to_postgres()
         return
-
-def migrate_sqlite_to_postgres():
-    if not IS_POSTGRES or not os.path.exists(DB_NAME):
-        return
-
-    try:
-        sq_conn = sqlite3.connect(DB_NAME)
-        sq_cur = sq_conn.cursor()
-
-        # Check local movies table
-        sq_cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='movies'")
-        if not sq_cur.fetchone():
-            sq_conn.close()
-            return
-
-        sq_cur.execute("SELECT code, title, caption, genre, views, is_vip, language FROM movies")
-        local_movies = sq_cur.fetchall()
-
-        if not local_movies:
-            sq_conn.close()
-            return
-
-        print(f"📦 [Auto-Migration] Found {len(local_movies)} movies in local SQLite. Migrating to Cloud PostgreSQL...")
-
-        pg_conn = get_db()
-        pg_cur = pg_conn.cursor()
-
-        migrated_m_cnt = 0
-        for row in local_movies:
-            code = row[0]
-            title = row[1]
-            caption = row[2] if len(row) > 2 else ""
-            genre = row[3] if len(row) > 3 else "Umumiy"
-            views = row[4] if len(row) > 4 else 0
-            is_vip = row[5] if len(row) > 5 else 0
-            lang = row[6] if len(row) > 6 else "🇺🇿 O'zbekcha"
-
-            if not code or not title:
-                continue
-
-            pg_cur.execute("""
-                INSERT INTO movies (code, title, caption, genre, views, is_vip, language)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (code) DO UPDATE SET
-                title = EXCLUDED.title, caption = EXCLUDED.caption, genre = EXCLUDED.genre,
-                is_vip = EXCLUDED.is_vip, language = EXCLUDED.language
-            """, (str(code).strip(), str(title).strip(), str(caption or "").strip(), str(genre or "Umumiy").strip(), views or 0, is_vip or 0, str(lang or "🇺🇿 O'zbekcha").strip()))
-            migrated_m_cnt += 1
-
-        # Check local episodes table
-        sq_cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='episodes'")
-        if sq_cur.fetchone():
-            sq_cur.execute("SELECT movie_code, episode_title, file_id FROM episodes")
-            local_episodes = sq_cur.fetchall()
-            for m_code, ep_title, file_id in local_episodes:
-                if not m_code or not file_id:
-                    continue
-                pg_cur.execute("INSERT INTO episodes (movie_code, episode_title, file_id) VALUES (%s, %s, %s)", (str(m_code).strip(), str(ep_title).strip(), str(file_id).strip()))
-
-        pg_conn.commit()
-        pg_conn.close()
-        sq_conn.close()
-        print(f"🎉 [Auto-Migration Success] Successfully migrated {migrated_m_cnt} movies into Cloud PostgreSQL!")
-    except Exception as e:
-        print(f"Auto-Migration error: {e}")
 
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='episodes';")
     if not cursor.fetchone():
