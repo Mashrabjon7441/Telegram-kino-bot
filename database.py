@@ -899,9 +899,25 @@ def increment_movie_views(code):
     execute_query("UPDATE movies SET views = views + 1 WHERE code = ?", (code.strip(),), commit=True)
 
 def add_episode(movie_code, episode_title, file_id):
+    mc = movie_code.strip()
+    et = episode_title.strip()
+    fid = file_id.strip()
+
+    existing = execute_query(
+        "SELECT id FROM episodes WHERE movie_code = ? AND episode_title = ? LIMIT 1",
+        (mc, et),
+        fetchone=True
+    )
+    if existing:
+        return execute_query(
+            "UPDATE episodes SET file_id = ? WHERE id = ?",
+            (fid, existing[0]),
+            commit=True
+        ) is not None
+
     return execute_query(
         "INSERT INTO episodes (movie_code, episode_title, file_id) VALUES (?, ?, ?)",
-        (movie_code.strip(), episode_title.strip(), file_id.strip()),
+        (mc, et, fid),
         commit=True
     ) is not None
 

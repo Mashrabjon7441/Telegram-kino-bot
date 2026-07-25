@@ -266,7 +266,17 @@ def send_movie_card(chat_id, code, user_id):
     markup = types.InlineKeyboardMarkup(row_width=1)
     
     if episodes:
-        for ep_id, ep_title, _ in episodes:
+        seen_titles = set()
+        unique_episodes = []
+        # Sort so episodes with valid file_id come first
+        sorted_episodes = sorted(episodes, key=lambda x: (0 if x[2] and x[2] != 'demo_file_id' else 1, x[0]))
+        for ep_id, ep_title, file_id in sorted_episodes:
+            clean_title = (ep_title or "Qism").strip()
+            if clean_title not in seen_titles:
+                seen_titles.add(clean_title)
+                unique_episodes.append((ep_id, clean_title, file_id))
+
+        for ep_id, ep_title, _ in unique_episodes:
             markup.add(types.InlineKeyboardButton(text=f"🎬 {ep_title}", callback_data=f"play_ep:{ep_id}"))
     else:
         markup.add(types.InlineKeyboardButton(text="⚠️ Seriyalar hali yuklanmagan", callback_data="no_eps"))
