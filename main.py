@@ -1130,8 +1130,9 @@ def text_handler(message):
         current_chunk = header
 
         for code, title, genre, views, is_vip in movies:
+            safe_title = (title or "").replace('*', '').replace('_', '').replace('[', '(').replace(']', ')')
             vip_mark = " 🔒 [VIP]" if is_vip else ""
-            line = f"🔑 `{code}` - **{title}**{vip_mark} ({genre}) | 👁 {views} ta\n"
+            line = f"🔑 `{code}` - **{safe_title}**{vip_mark} ({genre}) | 👁 {views} ta\n"
             if len(current_chunk) + len(line) > 3800:
                 chunks.append(current_chunk)
                 current_chunk = "📋 **Davomi...**\n\n" + line
@@ -1145,7 +1146,8 @@ def text_handler(message):
             try:
                 bot.send_message(message.chat.id, ch, parse_mode="Markdown")
             except Exception:
-                bot.send_message(message.chat.id, ch)
+                plain = ch.replace('**', '').replace('`', '').replace('🔒 [VIP]', '🔒 VIP')
+                bot.send_message(message.chat.id, plain)
         return
 
     elif text == "📊 Statistika" and is_admin(user_id):
@@ -1415,16 +1417,28 @@ def process_user_search_query(message):
     if matches:
         markup = types.InlineKeyboardMarkup(row_width=1)
         for code, title, genre, views, is_vip in matches:
+            safe_t = (title or "").replace('*', '').replace('_', '').replace('[', '(').replace(']', ')')
             vip_mark = " 🔒 [VIP]" if is_vip else ""
-            markup.add(types.InlineKeyboardButton(text=f"🎬 {title}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
+            markup.add(types.InlineKeyboardButton(text=f"🎬 {safe_t}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
 
-        bot.send_message(message.chat.id, f"🔍 **'{query_text}' bo'yicha topilgan kinolar:**", reply_markup=markup, parse_mode="Markdown")
+        try:
+            bot.send_message(message.chat.id, f"🔍 **'{query_text}' bo'yicha topilgan kinolar:**", reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            bot.send_message(message.chat.id, f"🔍 '{query_text}' bo'yicha topilgan kinolar:", reply_markup=markup)
     else:
-        bot.send_message(
-            message.chat.id,
-            f"❌ **'{query_text}' nomli yoki kodli kino topilmadi.**\n\nNomini yoki kodini tekshirib qaytadan kiritib ko'ring yoki `@` orqali telegram qidiruvidan foydalaning.",
-            reply_markup=get_main_keyboard(user_id)
-        )
+        try:
+            bot.send_message(
+                message.chat.id,
+                f"❌ **'{query_text}' nomli yoki kodli kino topilmadi.**\n\nNomini yoki kodini tekshirib qaytadan kiritib ko'ring yoki `@` orqali telegram qidiruvidan foydalaning.",
+                reply_markup=get_main_keyboard(user_id),
+                parse_mode="Markdown"
+            )
+        except Exception:
+            bot.send_message(
+                message.chat.id,
+                f"❌ '{query_text}' nomli yoki kodli kino topilmadi.\n\nNomini yoki kodini tekshirib qaytadan kiritib ko'ring.",
+                reply_markup=get_main_keyboard(user_id)
+            )
 
 # ----------------- SUPPORT & PREMIUM WORKFLOWS -----------------
 
