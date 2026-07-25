@@ -364,8 +364,31 @@ def add_episode(movie_code, episode_title, file_id):
         print(f"Error saving episode: {e}")
         return False
 
+def find_movie_by_base_title(base_title):
+    clean = base_title.strip()
+    if not clean:
+        return None
+    res = execute_query("SELECT code, title FROM movies WHERE title = ? OR title = ?", (clean, f"[📺 SERIAL] {clean}"), fetchone=True)
+    if res:
+        return res
+    search = f"%{clean}%"
+    res = execute_query("SELECT code, title FROM movies WHERE title LIKE ? ORDER BY id ASC", (search,), fetchone=True)
+    return res
+
 def get_episodes(movie_code):
-    return execute_query("SELECT id, episode_title, file_id FROM episodes WHERE movie_code = ?", (movie_code.strip(),), fetchall=True)
+    res = execute_query("SELECT id, episode_title, file_id FROM episodes WHERE movie_code = ? ORDER BY id ASC", (movie_code.strip(),), fetchall=True)
+    if not res:
+        return []
+
+    import re
+    def ep_sort_key(item):
+        ep_title = item[1]
+        numbers = re.findall(r'\d+', ep_title)
+        if numbers:
+            return (0, int(numbers[0]))
+        return (1, item[0])
+
+    return sorted(res, key=ep_sort_key)
 
 def get_movie_episodes(movie_code):
     return get_episodes(movie_code)

@@ -2239,6 +2239,65 @@ def force_initial_movie_population():
                 database.set_movie_vip(code, True)
             print(f"✅ Initial batch force-added: {title} (Code: {code})")
 
+def extract_serial_info(raw_title, caption_text):
+    """
+    Extracts clean base serial name and episode title (e.g., '1-qism', '2-qism') from title/caption.
+    Returns: (is_serial, base_title, episode_title)
+    """
+    import re
+    full_text = f"{raw_title} {caption_text}"
+    text_lower = full_text.lower()
+
+    ep_patterns = [
+        (r'(\d+)\s*-\s*qism', '{n}-qism'),
+        (r'(\d+)\s*qism', '{n}-qism'),
+        (r'qism\s*(\d+)', '{n}-qism'),
+        (r'(\d+)\s*-\s*серия', '{n}-qism'),
+        (r'(\d+)\s*серия', '{n}-qism'),
+        (r'серия\s*(\d+)', '{n}-qism'),
+        (r'e(\d+)', '{n}-qism'),
+        (r's\d+e(\d+)', '{n}-qism'),
+        (r'part\s*(\d+)', '{n}-qism'),
+        (r'ep\s*(\d+)', '{n}-qism')
+    ]
+
+    ep_num = None
+    ep_title = "1-qism"
+
+    for pat, fmt in ep_patterns:
+        match = re.search(pat, text_lower)
+        if match:
+            try:
+                ep_num = int(match.group(1))
+                ep_title = fmt.format(n=ep_num)
+                break
+            except Exception:
+                pass
+
+    clean_base = raw_title
+    strip_pats = [
+        r'\d+\s*-\s*qism', r'\d+\s*qism', r'qism\s*\d+',
+        r'\d+\s*-\s*серия', r'\d+\s*серия', r'серия\s*\d+',
+        r'e\d+', r's\d+e\d+', r'part\s*\d+', r'ep\s*\d+',
+        r'\d+\s*-\s*сезон', r'\d+\s*сезон', r'сезон\s*\d+'
+    ]
+    for pat in strip_pats:
+        clean_base = re.sub(pat, '', clean_base, flags=re.IGNORECASE)
+
+    clean_base = re.sub(r'[\(\)\[\]#\-:]+', ' ', clean_base)
+    clean_base = " ".join([w for w in clean_base.split() if not w.startswith('#')])
+    clean_base = clean_base.strip()
+
+    if not clean_base:
+        clean_base = raw_title.strip()
+
+    is_serial = (ep_num is not None) or any(w in text_lower for w in ['qism', 'серия', 'сезон', 'serial', '#serial'])
+    if not is_serial:
+        ep_title = "To'liq film"
+
+    return is_serial, clean_base, ep_title
+
+
 def telethon_movie_scraper_worker():
     """Telethon Userbot client that searches user account chat, Saved Messages ('me'), and public Telegram channels to import all video files"""
     import asyncio
@@ -2281,7 +2340,6 @@ def telethon_movie_scraper_worker():
                     await asyncio.sleep(15)
                     continue
 
-                # Build comprehensive target list: Saved Messages ('me') + account dialogs + custom channel + public channels
                 targets = ['me']
 
                 custom_target_channel = database.get_setting('telethon_target_channel')
@@ -2290,7 +2348,6 @@ def telethon_movie_scraper_worker():
                     if clean_target and clean_target not in targets:
                         targets.append(clean_target)
 
-                # Auto-fetch active dialogs from user account history
                 try:
                     dialogs = await client.get_dialogs(limit=50)
                     for d in dialogs:
@@ -2318,12 +2375,10 @@ def telethon_movie_scraper_worker():
                             if database.get_setting('telethon_scraper_paused') == '1':
                                 break
 
-                            # 1. Skip Audio & Voice files (Songs, MP3s, Voice notes)
                             if getattr(msg, 'audio', None) or getattr(msg, 'voice', None):
                                 continue
 
                             if msg.video or msg.document:
-                                # Skip audio/image mime types
                                 mime = getattr(msg.document, 'mime_type', '') or ''
                                 if mime.startswith('audio/') or mime.startswith('image/'):
                                     continue
@@ -2334,7 +2389,6 @@ def telethon_movie_scraper_worker():
                                 if not clean_title:
                                     clean_title = raw_title
 
-                                # 2. Filter: Only import videos longer than 40 MINUTES (2400 seconds)!
                                 duration = getattr(msg.file, 'duration', None)
                                 if duration is None and msg.document and getattr(msg.document, 'attributes', None):
                                     for attr in msg.document.attributes:
@@ -2354,30 +2408,28 @@ def telethon_movie_scraper_worker():
                                         print(f"⏩ [Filter Skipped] Small file ({file_size_mb:.1f}MB < 150MB): {clean_title[:30]}")
                                         continue
 
-                                cap_lower = cap.lower()
+                                # Serial vs Movie Grouping Logic
+                                is_serial, base_title, episode_title = extract_serial_info(clean_title, cap)
+                                full_title = f"[📺 SERIAL] {base_title}" if is_serial else base_title
 
-                                serial_patterns = [
-                                    r'\d+\s*-\s*qism', r'\d+\s*qism', r'qism\s*\d+',
-                                    r'\d+\s*-\s*серия', r'\d+\s*серия', r'серия\s*\d+',
-                                    r'\d+\s*-\s*сезон', r'\d+\s*сезон', r'сезон\s*\d+',
-                                    r'e\d+', r's\d+e\d+', r'part\s*\d+', r'ep\s*\d+', r'#serial', r'serial'
-                                ]
-                                is_serial = any(re.search(pat, cap_lower) for pat in serial_patterns)
-                                type_prefix = "[📺 SERIAL] " if is_serial else ""
-                                full_title = f"{type_prefix}{clean_title}"
+                                # Check if Serial / Movie already exists in database
+                                existing_movie = database.find_movie_by_base_title(base_title)
+                                if existing_movie:
+                                    movie_code = existing_movie[0]
+                                    print(f"📺 [Serial Grouping] Found existing entry: {base_title} (Code: {movie_code}). Adding episode: {episode_title}")
+                                else:
+                                    movie_code = generate_unique_code()
+                                    database.add_movie(movie_code, full_title, cap, "🌐 Boshqa", 0, "🇺🇿 O'zbekcha")
+                                    print(f"✨ [New Entry Created] {full_title} (Code: {movie_code})")
 
-                                if not database.movie_exists_by_exact_title(full_title):
-                                    code = generate_unique_code()
-                                    database.add_movie(code, full_title, cap, "🌐 Boshqa", 0, "🇺🇿 O'zbekcha")
-                                    
-                                    try:
-                                        await client.send_file(bot_username, msg.media, caption=f"/start {code}")
-                                    except Exception as e_send:
-                                        print(f"Userbot send_file exception: {e_send}")
+                                try:
+                                    await client.send_file(bot_username, msg.media, caption=f"/start {movie_code}")
+                                except Exception as e_send:
+                                    print(f"Userbot send_file exception: {e_send}")
 
-                                    database.trigger_auto_backup(bot)
-                                    print(f"🚀 Telethon Userbot AUTO-COPIED MOVIE ({duration or '150MB+'}s): {full_title} (Code: {code})")
-                                    await asyncio.sleep(2)
+                                database.trigger_auto_backup(bot)
+                                print(f"🚀 Telethon Userbot AUTO-COPIED ({duration or '150MB+'}s): {full_title} -> Ep: {episode_title} (Code: {movie_code})")
+                                await asyncio.sleep(2)
                     except Exception as ex:
                         print(f"Error scraping chat {ch}: {ex}")
 
