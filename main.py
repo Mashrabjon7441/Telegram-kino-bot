@@ -1125,11 +1125,27 @@ def text_handler(message):
             bot.send_message(message.chat.id, "Hozircha ma'lumotlar bazasida kinolar yo'q.")
             return
 
-        response = "📋 **Kinolar ro'yxati (kod - nomi - janr - ko'rishlar - VIP):**\n\n"
+        header = f"📋 **Kinolar ro'yxati (Jami: {len(movies)} ta kino):**\n\n"
+        chunks = []
+        current_chunk = header
+
         for code, title, genre, views, is_vip in movies:
             vip_mark = " 🔒 [VIP]" if is_vip else ""
-            response += f"🔑 `{code}` - **{title}**{vip_mark} ({genre}) | 👁 {views} ta\n"
-        bot.send_message(message.chat.id, response, parse_mode="Markdown")
+            line = f"🔑 `{code}` - **{title}**{vip_mark} ({genre}) | 👁 {views} ta\n"
+            if len(current_chunk) + len(line) > 3800:
+                chunks.append(current_chunk)
+                current_chunk = "📋 **Davomi...**\n\n" + line
+            else:
+                current_chunk += line
+
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        for ch in chunks:
+            try:
+                bot.send_message(message.chat.id, ch, parse_mode="Markdown")
+            except Exception:
+                bot.send_message(message.chat.id, ch)
         return
 
     elif text == "📊 Statistika" and is_admin(user_id):
