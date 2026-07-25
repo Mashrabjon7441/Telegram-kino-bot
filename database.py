@@ -29,63 +29,74 @@ def get_db():
         conn.execute("PRAGMA busy_timeout = 30000;")
         return conn
 
+import time
+
 def execute_query(query, params=(), commit=True, fetchone=False, fetchall=False, return_lastid=False):
-    conn = get_db()
-    try:
-        cur = conn.cursor()
-        sql = query
-        if IS_POSTGRES:
-            sql = sql.replace('?', '%s')
-            if 'INSERT OR IGNORE INTO users' in sql:
-                sql = "INSERT INTO users (user_id, username, referred_by) VALUES (%s, %s, %s) ON CONFLICT (user_id) DO NOTHING"
-            elif 'INSERT OR IGNORE INTO admins' in sql:
-                sql = "INSERT INTO admins (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING"
-            elif 'INSERT OR REPLACE INTO settings' in sql:
-                sql = "INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
-            elif 'INSERT OR REPLACE INTO channels' in sql:
-                sql = "INSERT INTO channels (channel_id, title, invite_link) VALUES (%s, %s, %s) ON CONFLICT (channel_id) DO UPDATE SET title = EXCLUDED.title, invite_link = EXCLUDED.invite_link"
-            elif 'INSERT OR REPLACE INTO ratings' in sql:
-                sql = "INSERT INTO ratings (user_id, movie_code, rating) VALUES (%s, %s, %s) ON CONFLICT (user_id, movie_code) DO UPDATE SET rating = EXCLUDED.rating"
-            elif 'INSERT OR REPLACE INTO premium_users' in sql:
-                if 'NULL' in sql:
-                    sql = "INSERT INTO premium_users (user_id, expire_date, is_lifetime) VALUES (%s, NULL, 1) ON CONFLICT (user_id) DO UPDATE SET expire_date = NULL, is_lifetime = 1"
-                else:
-                    sql = "INSERT INTO premium_users (user_id, expire_date, is_lifetime) VALUES (%s, %s, 0) ON CONFLICT (user_id) DO UPDATE SET expire_date = EXCLUDED.expire_date, is_lifetime = 0"
-            elif 'INSERT OR REPLACE INTO movies' in sql:
-                sql = """
-                    INSERT INTO movies (code, title, caption, genre, views, is_vip, language)
-                    VALUES (%s, %s, %s, %s, COALESCE((SELECT views FROM movies WHERE code = %s), 0), %s, %s)
-                    ON CONFLICT (code) DO UPDATE SET
-                    title = EXCLUDED.title, caption = EXCLUDED.caption, genre = EXCLUDED.genre,
-                    is_vip = EXCLUDED.is_vip, language = EXCLUDED.language
-                """
-
-        if return_lastid and IS_POSTGRES and 'RETURNING' not in sql.upper():
-            if 'INSERT INTO support_tickets' in sql:
-                sql += " RETURNING ticket_id"
-            elif 'INSERT INTO pending_queue' in sql:
-                sql += " RETURNING id"
-
-        cur.execute(sql, params)
-        if commit:
-            conn.commit()
-
-        if return_lastid:
+    for attempt in range(2):
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            sql = query
             if IS_POSTGRES:
-                lastid = cur.fetchone()[0]
-            else:
-                lastid = cur.lastrowid
-            return lastid
+                sql = sql.replace('?', '%s')
+                if 'INSERT OR IGNORE INTO users' in sql:
+                    sql = "INSERT INTO users (user_id, username, referred_by) VALUES (%s, %s, %s) ON CONFLICT (user_id) DO NOTHING"
+                elif 'INSERT OR IGNORE INTO admins' in sql:
+                    sql = "INSERT INTO admins (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING"
+                elif 'INSERT OR REPLACE INTO settings' in sql:
+                    sql = "INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
+                elif 'INSERT OR REPLACE INTO channels' in sql:
+                    sql = "INSERT INTO channels (channel_id, title, invite_link) VALUES (%s, %s, %s) ON CONFLICT (channel_id) DO UPDATE SET title = EXCLUDED.title, invite_link = EXCLUDED.invite_link"
+                elif 'INSERT OR REPLACE INTO ratings' in sql:
+                    sql = "INSERT INTO ratings (user_id, movie_code, rating) VALUES (%s, %s, %s) ON CONFLICT (user_id, movie_code) DO UPDATE SET rating = EXCLUDED.rating"
+                elif 'INSERT OR REPLACE INTO premium_users' in sql:
+                    if 'NULL' in sql:
+                        sql = "INSERT INTO premium_users (user_id, expire_date, is_lifetime) VALUES (%s, NULL, 1) ON CONFLICT (user_id) DO UPDATE SET expire_date = NULL, is_lifetime = 1"
+                    else:
+                        sql = "INSERT INTO premium_users (user_id, expire_date, is_lifetime) VALUES (%s, %s, 0) ON CONFLICT (user_id) DO UPDATE SET expire_date = EXCLUDED.expire_date, is_lifetime = 0"
+                elif 'INSERT OR REPLACE INTO movies' in sql:
+                    sql = """
+                        INSERT INTO movies (code, title, caption, genre, views, is_vip, language)
+                        VALUES (%s, %s, %s, %s, COALESCE((SELECT views FROM movies WHERE code = %s), 0), %s, %s)
+                        ON CONFLICT (code) DO UPDATE SET
+                        title = EXCLUDED.title, caption = EXCLUDED.caption, genre = EXCLUDED.genre,
+                        is_vip = EXCLUDED.is_vip, language = EXCLUDED.language
+                    """
 
-        if fetchone:
-            res = cur.fetchone()
-            return tuple(res) if res else None
-        if fetchall:
-            res = cur.fetchall()
-            return [tuple(r) for r in res] if res else []
-        return cur.rowcount
-    finally:
-        conn.close()
+            if return_lastid and IS_POSTGRES and 'RETURNING' not in sql.upper():
+                if 'INSERT INTO support_tickets' in sql:
+                    sql += " RETURNING ticket_id"
+                elif 'INSERT INTO pending_queue' in sql:
+                    sql += " RETURNING id"
+
+            cur.execute(sql, params)
+            if commit:
+                conn.commit()
+
+            if return_lastid:
+                if IS_POSTGRES:
+                    lastid = cur.fetchone()[0]
+                else:
+                    lastid = cur.lastrowid
+                conn.close()
+                return lastid
+
+            if fetchone:
+                res = cur.fetchone()
+                conn.close()
+                return tuple(res) if res else None
+            if fetchall:
+                res = cur.fetchall()
+                conn.close()
+                return [tuple(r) for r in res] if res else []
+            res_cnt = cur.rowcount
+            conn.close()
+            return res_cnt
+        except Exception as e:
+            if attempt == 1:
+                print(f"Database query exception: {e}")
+                raise e
+            time.sleep(0.3)
 
 def init_db():
     conn = get_db()

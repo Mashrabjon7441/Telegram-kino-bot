@@ -2617,7 +2617,7 @@ if __name__ == '__main__':
 
     print("Bot ishga tushmoqda...")
     import time
-    time.sleep(12)  # Give Render 12s grace period to shut down old container process completely
+    print("Bot instant polling startup initiated...")
 
     try:
         bot.remove_webhook()
@@ -2626,10 +2626,10 @@ if __name__ == '__main__':
 
     while True:
         try:
-            bot.polling(non_stop=True, interval=1, timeout=30, skip_pending=True)
+            bot.polling(non_stop=True, interval=0, timeout=30, skip_pending=False)
         except Exception as e:
-            print(f"Polling conflict or exception ({e}). Waiting 8s for old instance release...")
-            time.sleep(8)
+            print(f"Polling conflict or exception ({e}). Retrying polling...")
+            time.sleep(3)
 
 
 
