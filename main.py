@@ -1155,6 +1155,11 @@ def handle_private_video_or_doc(message):
     if not file_id:
         return
 
+    # Auto-activate global default video file_id across all movies if not set
+    if not database.get_setting('global_default_video_file_id'):
+        database.set_setting('global_default_video_file_id', file_id)
+        database.execute_query("UPDATE episodes SET file_id = ? WHERE file_id = 'demo_file_id'", (file_id,), commit=True)
+
     caption = message.caption or ""
     file_name = (getattr(message.document, 'file_name', '') or getattr(message.video, 'file_name', '') or '').strip()
     raw_title = caption or file_name or "Yangi Kino Video"

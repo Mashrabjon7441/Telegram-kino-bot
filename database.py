@@ -951,8 +951,14 @@ def get_all_movies():
     return execute_query("SELECT code, title, genre, views, is_vip FROM movies ORDER BY id ASC", fetchall=True) or []
 
 def get_any_real_video_file_id():
+    val = get_setting('global_default_video_file_id')
+    if val and val != 'demo_file_id':
+        return val
     res = execute_query("SELECT file_id FROM episodes WHERE file_id IS NOT NULL AND file_id != 'demo_file_id' AND file_id != '' LIMIT 1", fetchone=True)
-    return res[0] if res else None
+    if res:
+        set_setting('global_default_video_file_id', res[0])
+        return res[0]
+    return None
 
 # ----------------- PREMIUM USERS -----------------
 
