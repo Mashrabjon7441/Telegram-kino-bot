@@ -708,6 +708,35 @@ def callback_handler(call):
         else:
             bot.send_message(call.message.chat.id, "Xatolik yuz berdi ma'lumotlar bazasida.", reply_markup=get_admin_keyboard(user_id))
 
+    elif call.data.startswith("ep_type:"):
+        choice = call.data.split(":")[1]
+        state = admin_states.get(user_id, {})
+        code = state.get('code')
+        file_id = state.get('pending_ep_file_id')
+
+        if choice == "single":
+            bot.answer_callback_query(call.id, "🎬 1 ta to'liq film tanlandi")
+            if code and file_id:
+                database.add_episode(code, "To'liq film", file_id)
+                bot.send_message(
+                    call.message.chat.id,
+                    f"✅ **[VIDEO TO'LIQ FILM SIFATIDA SAQLANDI]**\n\n"
+                    f"🔑 **Kino kodi:** `{code}`\n"
+                    f"📌 Video fayli Cloud PostgreSQL bazasiga 1 ta to'liq film sifatida saqlandi!",
+                    parse_mode="Markdown",
+                    reply_markup=get_admin_keyboard(user_id)
+                )
+            admin_states.pop(user_id, None)
+
+        elif choice == "multi":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(
+                call.message.chat.id,
+                "📌 **Qism sarlavhasini kiriting (Masalan: `1-qism`, `2-qism` yoki `Temir Odam 1`):**",
+                parse_mode="Markdown"
+            )
+            bot.register_next_step_handler(msg, process_add_episode_title, code, file_id)
+
     elif call.data.startswith("add_more_ep:"):
         code = call.data.split(":")[1]
         bot.answer_callback_query(call.id)
@@ -2369,8 +2398,21 @@ def process_add_episode_file(message, code):
         bot.register_next_step_handler(msg, process_add_episode_file, code)
         return
 
-    msg = bot.send_message(message.chat.id, "Kino qismi sarlavhasini kiriting (Masalan: *1-qism*, *2-qism* yoki *To'liq film*):", parse_mode="Markdown")
-    bot.register_next_step_handler(msg, process_add_episode_title, code, file_id)
+    admin_states[user_id] = {'pending_ep_file_id': file_id, 'code': code}
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton(text="🎬 1 ta to'liq film (Yakka kino)", callback_data="ep_type:single"),
+        types.InlineKeyboardButton(text="📺 Ko'p qismli (Seriya / Franshiza)", callback_data="ep_type:multi")
+    )
+    bot.send_message(
+        message.chat.id,
+        "❓ **Ushbu kino ko'p qismlimi yoki 1 ta to'liq filmmi?**\n\n"
+        "• **1 ta to'liq film** — ortiqcha qism tugmalarisiz to'g'ridan-to'g'ri video yuboriladi.\n"
+        "• **Ko'p qismli** — 1-qism, 2-qism kabi qism tanlash tugmalari yaratiladi.",
+        reply_markup=markup,
+        parse_mode="Markdown"
+    )
 
 def process_add_episode_title(message, code, file_id):
     user_id = message.from_user.id
