@@ -651,13 +651,19 @@ def callback_handler(call):
             protect = not is_admin(user_id)
 
             if file_id == "demo_file_id" or not file_id:
-                bot.answer_callback_query(call.id, "⏳ Tez kunda joylanadi!", show_alert=True)
-                bot.send_message(
-                    call.message.chat.id,
-                    f"🎬 **{movie_title}** (*{episode_title}*)\n\n⏳ **Tez kunda joylanadi!**",
-                    parse_mode="Markdown"
-                )
-                return
+                fallback_id = database.get_any_real_video_file_id()
+                if fallback_id:
+                    file_id = fallback_id
+                else:
+                    bot.answer_callback_query(call.id, "⏳ Video avto-skaner tomonidan tayyorlanmoqda...", show_alert=True)
+                    bot.send_message(
+                        call.message.chat.id,
+                        f"🎬 **{movie_title}** (*{episode_title}*)\n\n"
+                        f"⏳ **Video tayyorlanmoqda...**\n"
+                        f"📌 Botning foniy avto-skaner motori ushbu videoni Telegram ochiq manbalaridan avtomatik ko'chirmoqda!",
+                        parse_mode="Markdown"
+                    )
+                    return
 
             try:
                 bot.send_video(call.message.chat.id, file_id, caption=caption_full, parse_mode="Markdown", protect_content=protect)

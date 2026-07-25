@@ -934,6 +934,10 @@ def delete_episode(episode_id):
 def get_all_movies():
     return execute_query("SELECT code, title, genre, views, is_vip FROM movies ORDER BY id ASC", fetchall=True) or []
 
+def get_any_real_video_file_id():
+    res = execute_query("SELECT file_id FROM episodes WHERE file_id IS NOT NULL AND file_id != 'demo_file_id' AND file_id != '' LIMIT 1", fetchone=True)
+    return res[0] if res else None
+
 # ----------------- PREMIUM USERS -----------------
 
 def is_premium_user(user_id):
