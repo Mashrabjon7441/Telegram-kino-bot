@@ -932,7 +932,7 @@ def delete_episode(episode_id):
     return res is not None
 
 def get_all_movies():
-    return execute_query("SELECT code, title, genre, views, is_vip FROM movies ORDER BY id DESC", fetchall=True) or []
+    return execute_query("SELECT code, title, genre, views, is_vip FROM movies ORDER BY id ASC", fetchall=True) or []
 
 # ----------------- PREMIUM USERS -----------------
 
