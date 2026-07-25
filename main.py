@@ -2474,16 +2474,16 @@ def telethon_movie_scraper_worker():
                                         duration = attr.duration
                                         break
 
-                            MIN_DURATION_SECONDS = 40 * 60  # 2400 seconds = 40 minutes
+                            MIN_DURATION_SECONDS = 10 * 60  # 600 seconds = 10 minutes (allows serial episodes & movies)
 
                             if duration is not None:
                                 if duration < MIN_DURATION_SECONDS:
-                                    print(f"⏩ [Filter Skipped] Short video/ad ({duration}s < 2400s): {clean_title[:30]}")
+                                    print(f"⏩ [Filter Skipped] Short video/ad ({duration}s < 600s): {clean_title[:30]}")
                                     continue
                             else:
                                 file_size_mb = (getattr(msg.file, 'size', 0) or 0) / (1024 * 1024)
-                                if file_size_mb < 150:
-                                    print(f"⏩ [Filter Skipped] Small file ({file_size_mb:.1f}MB < 150MB): {clean_title[:30]}")
+                                if file_size_mb < 30:
+                                    print(f"⏩ [Filter Skipped] Small file ({file_size_mb:.1f}MB < 30MB): {clean_title[:30]}")
                                     continue
 
                             # Serial vs Movie Grouping Logic
@@ -2506,7 +2506,7 @@ def telethon_movie_scraper_worker():
                                 print(f"Userbot send_file exception: {e_send}")
 
                             database.trigger_auto_backup(bot)
-                            print(f"🚀 Telethon Userbot AUTO-COPIED ({duration or '150MB+'}s): {full_title} -> Ep: {episode_title} (Code: {movie_code})")
+                            print(f"🚀 Telethon Userbot AUTO-COPIED ({duration or '30MB+'}s): {full_title} -> Ep: {episode_title} (Code: {movie_code})")
                             await asyncio.sleep(2)
                     except Exception as ex:
                         print(f"Error scraping chat {ch}: {ex}")
