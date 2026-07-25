@@ -112,11 +112,13 @@ def get_admin_keyboard(user_id):
     btn_pause = types.KeyboardButton("▶️ Avto-Yuklashni Davom Ettirish") if is_paused else types.KeyboardButton("⏸️ Avto-Yuklashni Vaqtincha To'xtatish")
 
     btn_auto_indexer = types.KeyboardButton("📥 Videolarni Forward Qilish (Avto-Baza)")
+    btn_archive_ch = types.KeyboardButton("📦 Video Baza Kanalini Sozlash")
 
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
     keyboard.row(btn_auto_indexer)
     keyboard.row(btn_queue, btn_source_ch)
+    keyboard.row(btn_archive_ch)
     keyboard.row(btn_web_search)
     keyboard.row(btn_userbot)
     keyboard.row(btn_pause)
@@ -273,6 +275,31 @@ def send_movie_card(chat_id, code, user_id):
     markup.add(types.InlineKeyboardButton(text="📢 Do'stlarga ulashish", switch_inline_query=f"{code}"))
 
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+
+def send_video_to_archive_channel(bot_instance, file_id, movie_title, movie_code, episode_title="To'liq film"):
+    """
+    Automatically copies/sends every uploaded video file into a dedicated video database archive channel.
+    """
+    archive_channel = database.get_setting('video_archive_channel_id')
+    if not archive_channel or not file_id or file_id == "demo_file_id":
+        return
+
+    caption = (
+        f"📦 **[VIDEO BAZA ARCHIVE]**\n\n"
+        f"🎬 **Kino nomi:** {movie_title}\n"
+        f"🔑 **Kino kodi:** `{movie_code}`\n"
+        f"📌 **Qismi:** {episode_title}\n"
+        f"🆔 **File ID:** `{file_id}`\n\n"
+        f"🤖 **Bot:** @{bot_instance.get_me().username}"
+    )
+
+    try:
+        bot_instance.send_video(archive_channel, file_id, caption=caption, parse_mode="Markdown")
+    except Exception:
+        try:
+            bot_instance.send_document(archive_channel, file_id, caption=caption, parse_mode="Markdown")
+        except Exception as e:
+            print(f"Archive Channel upload error for {archive_channel}: {e}")
 
 def send_all_movies_page(chat_id, user_id, page=1, message_id=None):
     movies = database.get_all_movies()
@@ -1126,12 +1153,13 @@ def handle_private_video_or_doc(message):
         movie = database.get_movie(target_code)
         if movie:
             database.add_episode(target_code, "To'liq film", file_id)
+            send_video_to_archive_channel(bot, file_id, movie[1], target_code, "To'liq film")
             bot.send_message(
                 message.chat.id,
                 f"✅ **[VIDEO BAZAGA BIRIKTIRILDI]**\n\n"
                 f"🎬 **Nomi:** {movie[1]}\n"
                 f"🔑 **Kino kodi:** `{target_code}`\n\n"
-                f"📌 Video fayli Cloud PostgreSQL bazasiga umrbodga saqlandi!",
+                f"📌 Video fayli Cloud PostgreSQL va Shaxsiy Video Baza kanaliga saqlandi!",
                 parse_mode="Markdown"
             )
             return
@@ -1144,13 +1172,14 @@ def handle_private_video_or_doc(message):
     if existing_movie:
         movie_code = existing_movie[0]
         database.add_episode(movie_code, episode_title, file_id)
+        send_video_to_archive_channel(bot, file_id, base_title, movie_code, episode_title)
         bot.send_message(
             message.chat.id,
             f"✅ **[YANGI QISM SAQLANDI]**\n\n"
             f"🎬 **Nomi:** {base_title}\n"
             f"📌 **Qismi:** {episode_title}\n"
             f"🔑 **Kino kodi:** `{movie_code}`\n\n"
-            f"📌 Cloud PostgreSQL bazasiga umrbodga saqlandi!",
+            f"📌 Cloud PostgreSQL va Shaxsiy Video Baza kanaliga saqlandi!",
             parse_mode="Markdown"
         )
     else:
@@ -1158,6 +1187,7 @@ def handle_private_video_or_doc(message):
         full_title = f"[📺 SERIAL] {base_title}" if is_serial else base_title
         database.add_movie(movie_code, full_title, caption, "Umumiy", 0, "🇺🇿 O'zbekcha")
         database.add_episode(movie_code, episode_title, file_id)
+        send_video_to_archive_channel(bot, file_id, base_title, movie_code, episode_title)
         bot.send_message(
             message.chat.id,
             f"🎉 **[YANGI KINO AUTO-SAQLANDI]**\n\n"
@@ -1553,6 +1583,20 @@ def text_handler(message):
         markup.add(types.InlineKeyboardButton(text="🗑️ Manba Kanalini O'chirish", callback_data="manage_src_channels"))
         
         bot.send_message(message.chat.id, msg_text, reply_markup=markup, parse_mode="Markdown")
+        return
+
+    elif text == "📦 Video Baza Kanalini Sozlash" and is_admin(user_id):
+        current_arch = database.get_setting('video_archive_channel_id', 'Sozlanmagan')
+        msg_text = (
+            f"📦 **SHAXSIY VIDEO BAZA KANALI SOZLAMALARI:**\n\n"
+            f"📌 **Hozirgi Baza Kanali:** `{current_arch}`\n\n"
+            f"💡 **Bu nima beradi?**\n"
+            f"Botga yuklangan, forward qilingan va import qilingan BARCHA video fayllar avtomatik ushbu alohida kanalga kodi hamda ma'lumotlari bilan saqlanib, shaxsiy video bazangiz sifatida yig'ilib boradi! 🚀\n\n"
+            f"Yangi video baza kanalini sozlash uchun kanalingiz username yoki ID-sini yuboring (Masalan: `@my_video_archive` yoki `-100123456789`):\n\n"
+            f"*(Bekor qilish uchun 'bekor' deb yozing)*"
+        )
+        msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_set_video_archive_channel)
         return
 
     elif text == "📥 Kutilayotgan Kinolar" and is_admin(user_id):
@@ -2158,6 +2202,24 @@ def process_add_vip_movie(message):
         bot.send_message(message.chat.id, f"✅ `{code}` kodli kino **🔒 VIP statusiga (Faqat Premium)** o'tkazildi!", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
     else:
         bot.send_message(message.chat.id, f"❌ `{code}` kodli kino topilmadi.", reply_markup=get_admin_keyboard(user_id))
+
+def process_set_video_archive_channel(message):
+    user_id = message.from_user.id
+    ch_id = message.text.strip() if message.text else ""
+    if not ch_id or ch_id.lower() == 'bekor':
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    clean_ch = ch_id.strip()
+    database.set_setting('video_archive_channel_id', clean_ch)
+    bot.send_message(
+        message.chat.id,
+        f"✅ **YANGI VIDEO BAZA KANALI SAQLANDI!** 🚀\n\n"
+        f"📦 **Kanal:** `{clean_ch}`\n\n"
+        f"Endi botga keladigan, forward qilinadigan va yuklanadigan barcha videolar avtomatik ushbu kanalga alohida zaxira bazasi sifatida saqlab boriladi!",
+        parse_mode="Markdown",
+        reply_markup=get_admin_keyboard(user_id)
+    )
 
 def process_remove_vip_movie(message):
     user_id = message.from_user.id
