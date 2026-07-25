@@ -293,12 +293,13 @@ def send_all_movies_page(chat_id, user_id, page=1, message_id=None):
         page = total_pages
 
     start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
+    end_idx = min(start_idx + per_page, total_movies)
     page_movies = movies[start_idx:end_idx]
 
     text = (
         f"📋 **BARCHA KINOLAR RO'YXATI:**\n\n"
-        f"📊 **Jami kinolar soni:** **{total_movies} ta**\n"
+        f"📊 **Jami kinolar:** **{total_movies} ta**\n"
+        f"🔢 **Ko'rsatilmoqda:** **{start_idx + 1}-{end_idx}** (Jami **{total_movies}** tadan)\n"
         f"📄 **Sahifa:** **{page}** / **{total_pages}**\n\n"
     )
 
@@ -306,20 +307,29 @@ def send_all_movies_page(chat_id, user_id, page=1, message_id=None):
     for code, title, genre, views, is_vip in page_movies:
         safe_title = (title or "").replace('*', '').replace('_', '').replace('[', '(').replace(']', ')')
         vip_mark = " 🔒 [VIP]" if is_vip else ""
-        text += f"🔑 `{code}` - **{safe_title}**{vip_mark} ({genre}) | 👁 {views} ta\n"
         markup.add(types.InlineKeyboardButton(text=f"🎬 {safe_title}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
 
     # Pagination navigation row
     nav_row = []
     if page > 1:
-        nav_row.append(types.InlineKeyboardButton(text="⬅️ Orqaga", callback_data=f"all_movies_page:{page-1}"))
+        nav_row.append(types.InlineKeyboardButton(text="⬅️ Oldingi 10 ta", callback_data=f"all_movies_page:{page-1}"))
 
     nav_row.append(types.InlineKeyboardButton(text=f"📄 {page}/{total_pages}", callback_data="noop"))
 
     if page < total_pages:
-        nav_row.append(types.InlineKeyboardButton(text="Keyingi ➡️", callback_data=f"all_movies_page:{page+1}"))
+        nav_row.append(types.InlineKeyboardButton(text="Keyingi 10 ta ➡️", callback_data=f"all_movies_page:{page+1}"))
 
     markup.row(*nav_row)
+
+    # First & Last page quick jump if total pages > 2
+    if total_pages > 2:
+        jump_row = []
+        if page > 1:
+            jump_row.append(types.InlineKeyboardButton(text="⏮️ 1-sahifa", callback_data="all_movies_page:1"))
+        if page < total_pages:
+            jump_row.append(types.InlineKeyboardButton(text=f"{total_pages}-sahifa ⏭️", callback_data=f"all_movies_page:{total_pages}"))
+        if jump_row:
+            markup.row(*jump_row)
 
     if message_id:
         try:
