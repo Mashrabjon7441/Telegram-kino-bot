@@ -47,6 +47,24 @@ def generate_unique_code():
 LANGUAGES = ["🇺🇿 O'zbekcha", "🇷🇺 Ruscha (На русском)", "🇬🇧 Inglizcha (English)"]
 
 # Keyboards
+def get_user_display_name(target_user_id):
+    """Fetches First Name and Username of a Telegram User ID for Admin lists"""
+    try:
+        chat = bot.get_chat(target_user_id)
+        if chat:
+            first = chat.first_name or "Admin"
+            uname = f"@{chat.username}" if chat.username else "username yo'q"
+            return f"👤 **{first}** ({uname}) — ID: `{target_user_id}`"
+    except Exception:
+        pass
+
+    res = database.execute_query("SELECT username FROM users WHERE user_id = ?", (target_user_id,), fetchone=True)
+    if res and res[0]:
+        return f"👤 @{res[0]} — ID: `{target_user_id}`"
+
+    return f"👤 ID: `{target_user_id}`"
+
+
 def get_main_keyboard(user_id):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn_search = types.KeyboardButton("🔍 Kino qidirish")
@@ -817,11 +835,19 @@ def handle_private_video_or_doc(message):
         code = match.group(1)
         movie = database.get_movie(code)
         if movie:
-            database.add_episode(code, "To'liq film", file_id)
+            episodes = database.get_episodes(code)
+            is_serial = "[📺 SERIAL]" in (movie[1] or "")
+            if is_serial:
+                ep_num = len(episodes) + 1
+                ep_title = f"{ep_num}-qism"
+            else:
+                ep_title = "To'liq film"
+
+            database.add_episode(code, ep_title, file_id)
             database.trigger_auto_backup(bot)
-            print(f"✅ [Auto-Attach] Video file_id ({file_id[:15]}...) successfully linked to Movie Code {code} ({movie[1]})")
+            print(f"✅ [Auto-Attach] Video file_id ({file_id[:15]}...) successfully linked to Movie Code {code} ({movie[1]}) as '{ep_title}'")
             try:
-                bot.send_message(message.chat.id, f"✅ Video `{code}` kodli kino ({movie[1]}) bilan muvaffaqiyatli saqlandi!", parse_mode="Markdown")
+                bot.send_message(message.chat.id, f"✅ Video `{code}` kodli kino ({movie[1]} - {ep_title}) bilan muvaffaqiyatli saqlandi!", parse_mode="Markdown")
             except Exception:
                 pass
             return
@@ -1118,14 +1144,14 @@ def text_handler(message):
         list_text = "👑 **BOT ADMINLARI RO'YXATI:**\n\n"
         list_text += "🔴 **Bosh Adminlar (Super Admin):**\n"
         for sa in super_admins:
-            list_text += f"• `{sa}`\n"
+            list_text += f"• {get_user_display_name(sa)}\n"
 
         list_text += "\n🟡 **Kino Qo'shuvchi Adminlar:**\n"
         if db_admins:
             for da in db_admins:
-                list_text += f"• `{da}`\n"
+                list_text += f"• {get_user_display_name(da)}\n"
         else:
-            list_text += "*(Hozircha yo'q)*\n"
+            list_text += "*(Hozircha qo'shimcha adminlar yo'q)*\n"
 
         bot.send_message(message.chat.id, list_text, parse_mode="Markdown")
         return
