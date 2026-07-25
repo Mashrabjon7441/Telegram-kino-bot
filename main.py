@@ -2590,20 +2590,38 @@ def auto_movie_scout_worker():
             except Exception as err:
                 print(f"Auto-Scout term error for '{term}': {err}")
 
-            time.sleep(10)
+            time.sleep(1)
 
-        time.sleep(30)
+        time.sleep(10)
 
 
 
 def force_initial_movie_population():
-    """Clean empty database for real user content only. Auto-deletes old hardcoded demo movies."""
-    demo_codes = ["1010", "1020", "1030", "1040", "1050", "1060"]
-    for code in demo_codes:
-        movie = database.get_movie(code)
-        if movie and any(demo_name in movie[1] for demo_name in ["Аватар", "Брат 2", "Qashqirlar Makoni Vatan", "Гарри Поттер", "Форсаж 10", "Шрек"]):
-            database.delete_movie(code)
-            print(f"🗑️ [Demo Cleaned] Removed hardcoded demo movie: {code} - {movie[1]}")
+    """Populates top popular movies immediately if database has fewer than 10 movies"""
+    movies = database.get_all_movies()
+    if movies and len(movies) >= 10:
+        return
+
+    top_catalog = [
+        ("4810", "Avatar: Suv Yo'li (2022)", "🎬 **Avatar 2**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Pandora dunyosidagi ajoyib sarguzashtlar.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4811", "Interstellar (2014)", "🎬 **Interstellar**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Kosmos va vaqt bo'ylab insoniyatni qutqarish missiyasi.", "Fantastika", "🇺🇿 O'zbekcha"),
+        ("4812", "Forsaj 10 (2023)", "🎬 **Forsaj 10**\n⭐ Reyting: 8.5/10\n📝 Tavsif: Dom Toretto va uning jamoasining eng xavfli poyga missiyasi.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4813", "Garri Potter va Falsafa Tosh (2001)", "🎬 **Garri Potter 1**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Sehrgarlik maktabi Xogvarts va Garri Potterning sirli sarguzashtlari.", "Fantastika", "🇺🇿 O'zbekcha"),
+        ("4814", "Shrek 1 (2001)", "🎬 **Shrek 1**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Yashil maxluq Shrek va Eshakning qahramonlik sarguzashtlari.", "Komediya", "🇺🇿 O'zbekcha"),
+        ("4815", "Uyda Yolg'iz 1 (1990)", "🎬 **Uyda Yolg'iz 1**\n⭐ Reyting: 9.5/10\n📝 Tavsif: Kichkina Kevin yangi yil bayramida uyda yolg'iz qolib o'g'rilarga qarshi kurashadi.", "Komediya", "🇺🇿 O'zbekcha"),
+        ("4816", "Uyda Yolg'iz 2 (1992)", "🎬 **Uyda Yolg'iz 2**\n⭐ Reyting: 9.4/10\n📝 Tavsif: Kevin Nyu-Yorkda adashib qoladi va o'g'rilar bilan qayta toqnash keladi.", "Komediya", "🇺🇿 O'zbekcha"),
+        ("4817", "Muzlik Davri 1 (2002)", "🎬 **Muzlik Davri 1**\n⭐ Reyting: 8.7/10\n📝 Tavsif: Mamont Menni, Yo'lbars Diyego va Leni muzlik davrida inson chaqaloqini qutqaradi.", "Multfilm", "🇺🇿 O'zbekcha"),
+        ("4818", "Kung Fu Panda 1 (2008)", "🎬 **Kung Fu Panda 1**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Dangasa semiz panda Po ajdarho jangchisiga aylanadi.", "Multfilm", "🇺🇿 O'zbekcha"),
+        ("4819", "Grinch (2018)", "🎬 **Grinch**\n⭐ Reyting: 8.6/10\n📝 Tavsif: Yashil Grinch Yangi Yil bayramini o'g'irlamoqchi bo'ladi.", "Multfilm", "🇺🇿 O'zbekcha"),
+        ("4820", "John Wick 4 (2023)", "🎬 **John Wick 4**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Afsonaviy qotil Jon Vik Oliy Stolga qarshi hal qiluvchi jangni boshlaydi.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4821", "O'rgimchak Odam: Uyga Yo'l Yo'q (2021)", "🎬 **Spider-Man**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Piter Parker barcha koinotlardan kelgan dushmanlarga qarshi kurashadi.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4822", "Joker (2019)", "🎬 **Joker**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Artur Flekning Gotam shahridagi fojiali va psixologik o'zgarishi.", "Drama", "🇺🇿 O'zbekcha")
+    ]
+
+    for code, title, caption, genre, lang in top_catalog:
+        if not database.movie_exists_by_exact_title(title):
+            database.add_movie(code, title, caption, genre, random.randint(150, 990), lang)
+            print(f"✅ [Instant Auto-Populate] Added {title} (Code: {code})")
 
 def extract_serial_info(raw_title, caption_text):
     """
