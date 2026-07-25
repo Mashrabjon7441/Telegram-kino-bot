@@ -1673,6 +1673,8 @@ def process_telethon_config(message):
     msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_telethon_phone_step, api_id, api_hash)
 
+telethon_active_sessions = {}  # user_id -> {'client': client, 'loop': loop, 'phone': phone, 'hash': hash}
+
 def process_telethon_phone_step(message, api_id, api_hash):
     user_id = message.from_user.id
     phone = message.text.strip() if message.text else ""
@@ -1685,19 +1687,27 @@ def process_telethon_phone_step(message, api_id, api_hash):
     try:
         import asyncio
         from telethon import TelegramClient
+        from telethon.sessions import StringSession
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        client = TelegramClient('telethon_userbot_session', int(api_id), api_hash, loop=loop)
+        client = TelegramClient(StringSession(), int(api_id), api_hash, loop=loop)
 
         async def send_code_req():
             await client.connect()
             sent = await client.send_code_request(phone)
-            res = sent.phone_code_hash
-            await client.disconnect()
-            return res
+            return sent.phone_code_hash
 
         phone_code_hash = loop.run_until_complete(send_code_req())
+
+        telethon_active_sessions[user_id] = {
+            'client': client,
+            'loop': loop,
+            'phone': phone,
+            'api_id': api_id,
+            'api_hash': api_hash,
+            'hash': phone_code_hash
+        }
 
         msg_text = (
             f"📩 **TELEGRAM KOD YUBORILDI!**\n\n"
@@ -1706,36 +1716,51 @@ def process_telethon_phone_step(message, api_id, api_hash):
             f"*(Bekor qilish uchun 'bekor' deb yozing)*"
         )
         msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
-        bot.register_next_step_handler(msg, process_telethon_sms_step, api_id, api_hash, phone, phone_code_hash)
+        bot.register_next_step_handler(msg, process_telethon_sms_step)
 
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Telegram xavfsizlik kod so'rovida xatolik yuz berdi: {e}", reply_markup=get_admin_keyboard(user_id))
 
-def process_telethon_sms_step(message, api_id, api_hash, phone, phone_code_hash):
+
+def process_telethon_sms_step(message):
     user_id = message.from_user.id
     code = message.text.strip() if message.text else ""
     if not code or code.lower() == 'bekor':
+        session_info = telethon_active_sessions.pop(user_id, None)
+        if session_info and session_info.get('client'):
+            try:
+                session_info['loop'].run_until_complete(session_info['client'].disconnect())
+            except Exception:
+                pass
         bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    session_info = telethon_active_sessions.get(user_id)
+    if not session_info:
+        bot.send_message(message.chat.id, "⚠️ Seans vaqti tugadi yoki xatolik yuz berdi. Iltimos, qaytadan boshlang.", reply_markup=get_admin_keyboard(user_id))
         return
 
     bot.send_message(message.chat.id, "🔐 Telegram akauntingiz muvaffaqiyatli avtorizatsiyadan o'tkazilmoqda...", parse_mode="Markdown")
 
-    try:
-        import asyncio
-        from telethon import TelegramClient
+    client = session_info['client']
+    loop = session_info['loop']
+    phone = session_info['phone']
+    phone_code_hash = session_info['hash']
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        client = TelegramClient('telethon_userbot_session', int(api_id), api_hash, loop=loop)
+    try:
+        from telethon.errors import SessionPasswordNeededError
 
         async def complete_login():
-            await client.connect()
+            if not client.is_connected():
+                await client.connect()
             await client.sign_in(phone, code, phone_code_hash=phone_code_hash)
             session_str = client.session.save()
             await client.disconnect()
             return session_str
 
         session_string = loop.run_until_complete(complete_login())
+        telethon_active_sessions.pop(user_id, None)
+
         database.set_setting('telethon_session_string', session_string)
         database.set_setting('telethon_authorized', '1')
         database.trigger_auto_backup(bot)
@@ -1753,7 +1778,66 @@ def process_telethon_sms_step(message, api_id, api_hash, phone, phone_code_hash)
         bot.send_message(message.chat.id, success_text, parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
 
     except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Tasdiqlash kodini kiritishda xatolik: {e}\n\nKodni qaytadan tekshirib kiritib ko'ring.", reply_markup=get_admin_keyboard(user_id))
+        err_msg = str(e)
+        if "two-steps verification" in err_msg.lower() or "password" in err_msg.lower():
+            msg = bot.send_message(
+                message.chat.id,
+                "🔐 **Akauntingizda 2 bosqichli tasdiqlash (2FA Password) o'rnatilgan!**\n\n"
+                "Iltimos, Telegram **2FA Parolingizni** kiriting (Bekor qilish uchun 'bekor' deb yozing):",
+                parse_mode="Markdown"
+            )
+            bot.register_next_step_handler(msg, process_telethon_2fa_password_step)
+        else:
+            telethon_active_sessions.pop(user_id, None)
+            bot.send_message(
+                message.chat.id,
+                f"❌ Tasdiqlash kodini kiritishda xatolik: `{err_msg}`\n\n"
+                f"💡 **Sababi:** Kod noto'g'ri kiritilgan bo'lishi yoki ulanish uzilgan bo'lishi mumkin. Qaytadan urinib ko'ring.",
+                parse_mode="Markdown",
+                reply_markup=get_admin_keyboard(user_id)
+            )
+
+def process_telethon_2fa_password_step(message):
+    user_id = message.from_user.id
+    password = message.text.strip() if message.text else ""
+    session_info = telethon_active_sessions.get(user_id)
+
+    if not session_info or not password or password.lower() == 'bekor':
+        telethon_active_sessions.pop(user_id, None)
+        bot.send_message(message.chat.id, "Amal bekor qilindi.", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    client = session_info['client']
+    loop = session_info['loop']
+
+    try:
+        async def complete_2fa():
+            if not client.is_connected():
+                await client.connect()
+            await client.sign_in(password=password)
+            session_str = client.session.save()
+            await client.disconnect()
+            return session_str
+
+        session_string = loop.run_until_complete(complete_2fa())
+        telethon_active_sessions.pop(user_id, None)
+
+        database.set_setting('telethon_session_string', session_string)
+        database.set_setting('telethon_authorized', '1')
+        database.trigger_auto_backup(bot)
+
+        t = threading.Thread(target=telethon_movie_scraper_worker, daemon=True)
+        t.start()
+
+        bot.send_message(
+            message.chat.id,
+            "🎉 **TABRIKLAYMIZ! 2FA PAROL TASDIQLANDI VA IKKINCHI AKAUNT BOTGA ULANDI!** 🟢",
+            parse_mode="Markdown",
+            reply_markup=get_admin_keyboard(user_id)
+        )
+    except Exception as e:
+        telethon_active_sessions.pop(user_id, None)
+        bot.send_message(message.chat.id, f"❌ 2FA Parol xatosi: {e}", reply_markup=get_admin_keyboard(user_id))
 
 
 
