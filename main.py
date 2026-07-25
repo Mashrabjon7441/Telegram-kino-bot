@@ -616,13 +616,29 @@ def callback_handler(call):
             # Content protection: Blocks forwarding, saving/downloading to phone gallery, and screen recording/screenshots!
             protect = not is_admin(user_id)
 
+            if file_id == "demo_file_id" or not file_id:
+                bot.send_message(
+                    call.message.chat.id,
+                    f"🎬 **{movie_title}** (*{episode_title}*)\n\n"
+                    f"📌 **Ushbu qismning videofayli hali yuklanmagan!**\n\n"
+                    f"💡 *Kino videolaringiz bor kanaldan videoni ushbu botga Forward qilsangiz (yoki kodi bilan yuborsangiz), o'sha zahoti o'z joyiga birikadi va tayyor bo'ladi!* 🚀",
+                    parse_mode="Markdown"
+                )
+                return
+
             try:
                 bot.send_video(call.message.chat.id, file_id, caption=caption_full, parse_mode="Markdown", protect_content=protect)
             except Exception:
                 try:
                     bot.send_document(call.message.chat.id, file_id, caption=caption_full, parse_mode="Markdown", protect_content=protect)
                 except Exception as e:
-                    bot.send_message(call.message.chat.id, f"Kino yuborishda xatolik yuz berdi: {e}")
+                    bot.send_message(
+                        call.message.chat.id,
+                        f"🎬 **{movie_title}** (*{episode_title}*)\n\n"
+                        f"📌 **Ushbu qismning videofayli hali yuklanmagan!**\n\n"
+                        f"💡 *Kino videolaringiz bor kanaldan videoni ushbu botga Forward qilsangiz (yoki kodi bilan yuborsangiz), o'sha zahoti o'z joyiga birikadi va tayyor bo'ladi!* 🚀",
+                        parse_mode="Markdown"
+                    )
         else:
             bot.answer_callback_query(call.id, "❌ Ushbu qism topilmadi!", show_alert=True)
 
