@@ -1068,17 +1068,29 @@ def text_handler(message):
     elif text == "🔥 Top 10 kinolar":
         top_movies = database.get_top_movies(10)
         if not top_movies:
-            bot.send_message(message.chat.id, "Hozircha reyting shakllanmagan.")
+            bot.send_message(message.chat.id, "Hozircha reyting shakllanmagan. Yangi kinolar qo'shilishi kutilmoqda.")
             return
 
-        text_response = "🔥 **Eng ko'p ko'rilgan TOP 10 kinolar:**\n\n"
+        bot_info = bot.get_me()
+        bot_uname = bot_info.username or "Kino_Baza_N1_bot"
+
+        text_response = "🔥 **TIKTOK & INSTAGRAM REELS UCHUN TOP KINOLAR RO'YXATI:**\n\n"
+        text_response += "💡 *Ushbu kinolardan parchalar qirqib TikTok va Reels'ga joylasangiz, botingizga eng ko'p obunachilar kirib keladi:*\n\n"
+
         markup = types.InlineKeyboardMarkup(row_width=1)
         for idx, (code, title, genre, views, is_vip) in enumerate(top_movies, 1):
-            vip_mark = " 🔒" if is_vip else ""
-            text_response += f"{idx}. 🎬 **{title}**{vip_mark} — 👁 `{views}` marta (Kod: `{code}`)\n"
-            markup.add(types.InlineKeyboardButton(text=f"{idx}. 🎬 {title}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
+            safe_t = (title or "").replace('*', '').replace('_', '').replace('[', '(').replace(']', ')')
+            vip_mark = " 🔒 [VIP]" if is_vip else ""
+            text_response += f"{idx}. 🎬 **{safe_t}**{vip_mark}\n"
+            text_response += f"   👁 `{views}` marta ko'rilgan | 🔑 Kodi: `{code}`\n"
+            text_response += f"   📌 **Post matni:** `Kinoni to'liq HD ko'rish kodi: {code} 🎬 Bot: @{bot_uname}`\n\n"
+            markup.add(types.InlineKeyboardButton(text=f"{idx}. 🎬 {safe_t}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
 
-        bot.send_message(message.chat.id, text_response, reply_markup=markup, parse_mode="Markdown")
+        try:
+            bot.send_message(message.chat.id, text_response, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            plain_resp = text_response.replace('**', '').replace('`', '').replace('🔒 [VIP]', '🔒 VIP')
+            bot.send_message(message.chat.id, plain_resp, reply_markup=markup)
         return
 
     elif text == "❤️ Sevimlilarim":
