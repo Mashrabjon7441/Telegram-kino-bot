@@ -271,6 +271,72 @@ def send_movie_card(chat_id, code, user_id):
 
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
+def send_all_movies_page(chat_id, user_id, page=1, message_id=None):
+    movies = database.get_all_movies()
+    if not movies:
+        msg = "Hozircha ma'lumotlar bazasida kinolar yo'q."
+        if message_id:
+            try:
+                bot.edit_message_text(msg, chat_id, message_id)
+            except Exception:
+                pass
+        else:
+            bot.send_message(chat_id, msg)
+        return
+
+    total_movies = len(movies)
+    per_page = 10
+    total_pages = (total_movies + per_page - 1) // per_page
+    if page < 1:
+        page = 1
+    if page > total_pages:
+        page = total_pages
+
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    page_movies = movies[start_idx:end_idx]
+
+    text = (
+        f"📋 **BARCHA KINOLAR RO'YXATI:**\n\n"
+        f"📊 **Jami kinolar soni:** **{total_movies} ta**\n"
+        f"📄 **Sahifa:** **{page}** / **{total_pages}**\n\n"
+    )
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    for code, title, genre, views, is_vip in page_movies:
+        safe_title = (title or "").replace('*', '').replace('_', '').replace('[', '(').replace(']', ')')
+        vip_mark = " 🔒 [VIP]" if is_vip else ""
+        text += f"🔑 `{code}` - **{safe_title}**{vip_mark} ({genre}) | 👁 {views} ta\n"
+        markup.add(types.InlineKeyboardButton(text=f"🎬 {safe_title}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
+
+    # Pagination navigation row
+    nav_row = []
+    if page > 1:
+        nav_row.append(types.InlineKeyboardButton(text="⬅️ Orqaga", callback_data=f"all_movies_page:{page-1}"))
+
+    nav_row.append(types.InlineKeyboardButton(text=f"📄 {page}/{total_pages}", callback_data="noop"))
+
+    if page < total_pages:
+        nav_row.append(types.InlineKeyboardButton(text="Keyingi ➡️", callback_data=f"all_movies_page:{page+1}"))
+
+    markup.row(*nav_row)
+
+    if message_id:
+        try:
+            bot.edit_message_text(text, chat_id, message_id, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            try:
+                plain_text = text.replace('**', '').replace('`', '').replace('🔒 [VIP]', '🔒 VIP')
+                bot.edit_message_text(plain_text, chat_id, message_id, reply_markup=markup)
+            except Exception:
+                pass
+    else:
+        try:
+            bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            plain_text = text.replace('**', '').replace('`', '').replace('🔒 [VIP]', '🔒 VIP')
+            bot.send_message(chat_id, plain_text, reply_markup=markup)
+
 # /start command
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
@@ -438,6 +504,14 @@ def callback_handler(call):
             markup.add(types.InlineKeyboardButton(text=f"❌ O'chirish: @{ch}", callback_data=f"del_src_ch:{ch}"))
 
         bot.send_message(call.message.chat.id, "🗑️ **O'chirmoqchi bo'lgan manba kanalingizni tanlang:**", reply_markup=markup, parse_mode="Markdown")
+
+    elif call.data.startswith("all_movies_page:"):
+        page = int(call.data.split(":")[1])
+        bot.answer_callback_query(call.id)
+        send_all_movies_page(call.message.chat.id, user_id, page=page, message_id=call.message.message_id)
+
+    elif call.data == "noop":
+        bot.answer_callback_query(call.id)
 
     elif call.data.startswith("del_src_ch:"):
         target_ch = call.data.split(":")[1]
@@ -1119,35 +1193,8 @@ def text_handler(message):
         bot.register_next_step_handler(msg, process_movie_delete)
         return
 
-    elif text == "📋 Barcha kinolar" and is_admin(user_id):
-        movies = database.get_all_movies()
-        if not movies:
-            bot.send_message(message.chat.id, "Hozircha ma'lumotlar bazasida kinolar yo'q.")
-            return
-
-        header = f"📋 **Kinolar ro'yxati (Jami: {len(movies)} ta kino):**\n\n"
-        chunks = []
-        current_chunk = header
-
-        for code, title, genre, views, is_vip in movies:
-            safe_title = (title or "").replace('*', '').replace('_', '').replace('[', '(').replace(']', ')')
-            vip_mark = " 🔒 [VIP]" if is_vip else ""
-            line = f"🔑 `{code}` - **{safe_title}**{vip_mark} ({genre}) | 👁 {views} ta\n"
-            if len(current_chunk) + len(line) > 3800:
-                chunks.append(current_chunk)
-                current_chunk = "📋 **Davomi...**\n\n" + line
-            else:
-                current_chunk += line
-
-        if current_chunk:
-            chunks.append(current_chunk)
-
-        for ch in chunks:
-            try:
-                bot.send_message(message.chat.id, ch, parse_mode="Markdown")
-            except Exception:
-                plain = ch.replace('**', '').replace('`', '').replace('🔒 [VIP]', '🔒 VIP')
-                bot.send_message(message.chat.id, plain)
+    elif text == "📋 Barcha kinolar":
+        send_all_movies_page(message.chat.id, user_id, page=1)
         return
 
     elif text == "📊 Statistika" and is_admin(user_id):
