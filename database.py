@@ -156,6 +156,24 @@ def migrate_sqlite_to_postgres():
                     continue
                 pg_cur.execute("INSERT INTO episodes (movie_code, episode_title, file_id) VALUES (%s, %s, %s)", (str(m_code).strip(), str(ep_title).strip(), str(file_id).strip()))
 
+        # Check local settings table
+        sq_cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'")
+        if sq_cur.fetchone():
+            sq_cur.execute("SELECT key, value FROM settings")
+            local_settings = sq_cur.fetchall()
+            for key, val in local_settings:
+                if key and val:
+                    pg_cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", (str(key).strip(), str(val).strip()))
+
+        # Check local channels table
+        sq_cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='channels'")
+        if sq_cur.fetchone():
+            sq_cur.execute("SELECT channel_id, title, invite_link FROM channels")
+            local_channels = sq_cur.fetchall()
+            for ch_id, title, invite_link in local_channels:
+                if ch_id and title:
+                    pg_cur.execute("INSERT INTO channels (channel_id, title, invite_link) VALUES (%s, %s, %s) ON CONFLICT (channel_id) DO UPDATE SET title = EXCLUDED.title, invite_link = EXCLUDED.invite_link", (str(ch_id).strip(), str(title).strip(), str(invite_link).strip()))
+
         pg_conn.commit()
         pg_conn.close()
         sq_conn.close()
