@@ -532,7 +532,7 @@ def callback_handler(call):
 
         bot.answer_callback_query(call.id)
         markup = types.InlineKeyboardMarkup(row_width=1)
-        for code, title, views, is_vip in movies:
+        for code, title, genre, views, is_vip in movies:
             vip_mark = " 🔒" if is_vip else ""
             markup.add(types.InlineKeyboardButton(text=f"🎬 {title}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
 
@@ -958,7 +958,7 @@ def text_handler(message):
 
         text_response = "🔥 **Eng ko'p ko'rilgan TOP 10 kinolar:**\n\n"
         markup = types.InlineKeyboardMarkup(row_width=1)
-        for idx, (code, title, views, genre, is_vip) in enumerate(top_movies, 1):
+        for idx, (code, title, genre, views, is_vip) in enumerate(top_movies, 1):
             vip_mark = " 🔒" if is_vip else ""
             text_response += f"{idx}. 🎬 **{title}**{vip_mark} — 👁 `{views}` marta (Kod: `{code}`)\n"
             markup.add(types.InlineKeyboardButton(text=f"{idx}. 🎬 {title}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))

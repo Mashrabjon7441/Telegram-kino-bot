@@ -342,16 +342,16 @@ def movie_exists_by_exact_title(title):
 
 def search_movies_by_name(query):
     search = f"%{query.strip()}%"
-    return execute_query("SELECT code, title, genre, views, is_vip, language FROM movies WHERE title LIKE ? OR caption LIKE ? LIMIT 20", (search, search), fetchall=True)
+    return execute_query("SELECT code, title, genre, views, is_vip FROM movies WHERE title LIKE ? OR caption LIKE ? LIMIT 20", (search, search), fetchall=True)
 
 def get_movies_by_genre(genre):
-    return execute_query("SELECT code, title, views, is_vip, language FROM movies WHERE genre = ? ORDER BY id DESC LIMIT 30", (genre.strip(),), fetchall=True)
+    return execute_query("SELECT code, title, genre, views, is_vip FROM movies WHERE genre = ? ORDER BY id DESC LIMIT 30", (genre.strip(),), fetchall=True)
 
 def get_movies_by_language(language):
     return execute_query("SELECT code, title, genre, views, is_vip FROM movies WHERE language LIKE ? ORDER BY id DESC LIMIT 30", (f"%{language.strip()}%",), fetchall=True)
 
 def get_top_movies(limit=10):
-    return execute_query("SELECT code, title, views, genre, is_vip FROM movies ORDER BY views DESC LIMIT ?", (limit,), fetchall=True)
+    return execute_query("SELECT code, title, genre, views, is_vip FROM movies ORDER BY views DESC LIMIT ?", (limit,), fetchall=True)
 
 def increment_movie_views(code):
     execute_query("UPDATE movies SET views = views + 1 WHERE code = ?", (code.strip(),))
