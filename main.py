@@ -2597,108 +2597,169 @@ def auto_movie_scout_worker():
 
 
 def force_initial_movie_population():
-    """Populates 200+ top iconic movies across Marvel, DC, Uzbek classics, Turkish, Indian, Anime, and Hollywood sagas into Cloud PostgreSQL"""
-    marvel_dc = [
-        ("1001", "Temir Odam 1 (Iron Man)", "🎬 **Temir Odam 1**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Toni Starkning afsonaviy zirh va qahramonlik ibtidosi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1002", "Temir Odam 2 (Iron Man 2)", "🎬 **Temir Odam 2**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Ivan Vanko va Hukumat tazyiqiga qarshi jang.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1003", "Temir Odam 3 (Iron Man 3)", "🎬 **Temir Odam 3**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Mandarin dushmaniga qarshi so'nggi va hal qiluvchi toqnashuv.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1004", "Tor 1 (Thor)", "🎬 **Tor 1**\n⭐ Reyting: 8.7/10\n📝 Tavsif: Asgard shahzodasi Torning Yerga quvg'in qilinishi.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1005", "Tor 2: Zulmat Dunyosi", "🎬 **Tor 2**\n⭐ Reyting: 8.6/10\n📝 Tavsif: Malekit va qorong'u elf dushmanlariga qarshi jang.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1006", "Tor 3: Ragnaryok", "🎬 **Tor 3**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Hela ma'budasiga qarshi Asgardni qutqarish janglari.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1007", "Tor 4: Sevgi va Momaqaldiroq", "🎬 **Tor 4**\n⭐ Reyting: 8.5/10\n📝 Tavsif: Gorr Xudolar Qotiliga qarshi Tor va Jeyn Foster.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1008", "Kapitan Amerika: Birinchi Qasoskor", "🎬 **Kapitan Amerika 1**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Stiv Rojersning 2-jahon urushidagi qahramonligi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1009", "Kapitan Amerika: Qishki Askar", "🎬 **Kapitan Amerika 2**\n⭐ Reyting: 9.1/10\n📝 Tavsif: GIDRA fitnasi va Baki Barns bilan toqnashuv.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1010", "Kapitan Amerika: Fuqarolar Urushi", "🎬 **Kapitan Amerika 3**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Qasoskorlar jamoasining ikkiga bo'linishi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1011", "Qasoskorlar 1 (The Avengers)", "🎬 **Qasoskorlar 1**\n⭐ Reyting: 9.4/10\n📝 Tavsif: Nyu-Yorkka Lokining chitauri armiyasi xujumi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1012", "Qasoskorlar 2: Altron Asri", "🎬 **Qasoskorlar 2**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Sun'iy intellekt Altron sun'iyatiga qarshi jang.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1013", "Qasoskorlar 3: Cheksizlik Urushi", "🎬 **Qasoskorlar 3**\n⭐ Reyting: 9.7/10\n📝 Tavsif: Tanosning cheksizlik toshlarini yig'ishi va qiyomat.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1014", "Qasoskorlar 4: Intixoy (Endgame)", "🎬 **Qasoskorlar 4**\n⭐ Reyting: 9.8/10\n📝 Tavsif: Vaqt bo'ylab sayohat va Tanos ustidan buyuk g'alaba.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1015", "Galaktika Qo'riqchilari 1", "🎬 **Galaktika Qo'riqchilari 1**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Piter Kvill va uning samoviy tentaklar jamoasi.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1016", "Galaktika Qo'riqchilari 2", "🎬 **Galaktika Qo'riqchilari 2**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Piter Kvillning tirik sayyora otasi Ego bilan toqnashuvi.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1017", "Galaktika Qo'riqchilari 3", "🎬 **Galaktika Qo'riqchilari 3**\n⭐ Reyting: 9.4/10\n📝 Tavsif: Raketa yenotining hayotini qutqarish sarguzashti.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1018", "Qora Pantera 1", "🎬 **Qora Pantera 1**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Vakanda qiroli T'Challa va Kilmonger jangi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1019", "Qora Pantera 2: Vakanda Abadiy", "🎬 **Qora Pantera 2**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Namor suv osti shohiga qarshi Vakanda himoyasi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1020", "Doktor Strendj 1", "🎬 **Doktor Strendj 1**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Sehrgarlar oliy ustozi va vaqt halqasi siri.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1021", "Doktor Strendj 2: Jinnilik Ko'p Olamli", "🎬 **Doktor Strendj 2**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Alvon Jodugar Vanda va ko'p olamlar xavfi.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1022", "Dedpul 1 (Deadpool)", "🎬 **Dedpul 1**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Ueyd Uilsonning o'lmas va hazilkash qasosi.", "Komediya", "🇺🇿 O'zbekcha"),
-        ("1023", "Dedpul 2 (Deadpool 2)", "🎬 **Dedpul 2**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Keybl qotiliga qarshi X-Force jamoasi.", "Komediya", "🇺🇿 O'zbekcha"),
-        ("1024", "Dedpul va Volverin (Deadpool 3)", "🎬 **Dedpul 3**\n⭐ Reyting: 9.6/10\n📝 Tavsif: Dedpul va Losomaxa Volverin afsonaviy juftligi.", "Komediya", "🇺🇿 O'zbekcha"),
-        ("1025", "Chumoli Odam 1", "🎬 **Chumoli Odam 1**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Skott Lengning kichrayuvchi kostyum sarguzashti.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1026", "Betmen: Boshlanish (Batman Begins)", "🎬 **Betmen 1**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Bryus Ueynning Gotam qahramoniga aylanishi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1027", "Qorong'u Ritsar (The Dark Knight)", "🎬 **Qorong'u Ritsar**\n⭐ Reyting: 9.9/10\n📝 Tavsif: Betmen va Joxer o'rtasidagi buyuk daho jang.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1028", "Qorong'u Ritsar: Afsonaning Qaytishi", "🎬 **Betmen 3**\n⭐ Reyting: 9.6/10\n📝 Tavsif: Beyn maxluqiga qarshi Gotamning so'nggi jangi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1029", "Po'lat Odam (Superman)", "🎬 **Supermen**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Kriptonlik Klark Kent va Zod general jangi.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1030", "Betmen Supermanga Qarshi", "🎬 **Betmen vs Supermen**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Ikki buyuk qahramonning dahshatli toqnashuvi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1031", "Mo'jizakor Ayol 1 (Wonder Woman)", "🎬 **Wonder Woman**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Amazonka malikasi Diana va urush xudosi Ares.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1032", "Akvamen 1 (Aquaman)", "🎬 **Akvamen 1**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Atlantis dengiz shohligi uchun taxt jangi.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1033", "Javobkorlar Jamoasi (Suicide Squad)", "🎬 **Suicide Squad**\n⭐ Reyting: 8.6/10\n📝 Tavsif: Maxfiy jinoyatchilar jamoasining qutqaruv missiyasi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1034", "Betmen 2022 (The Batman)", "🎬 **The Batman 2022**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Gotamdagi Topishmoqchi qotili sirlari.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1035", "Flesh (The Flash)", "🎬 **The Flash**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Barri Allenning o me'g'tmishga sayohati va ko'p olam.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1036", "Joker 1 (2019)", "🎬 **Joker 1**\n⭐ Reyting: 9.6/10\n📝 Tavsif: Artur Flekning fojiali psixologik o'zgarishi.", "Drama", "🇺🇿 O'zbekcha")
+    """Populates clean single-code franchise entries with episodes into Cloud PostgreSQL"""
+    unified_franchises = [
+        ("1001", "[📺 SERIYA] Temir Odam (Iron Man)", "🎬 **Temir Odam barcha qismlari (1, 2, 3)**\n⭐ Reyting: 9.0/10\n📝 Toni Starkning afsonaviy zirh va qahramonlik sarguzashtlari.", "Jangari", [
+            "1-qism (Temir Odam 1 - 2008)",
+            "2-qism (Temir Odam 2 - 2010)",
+            "3-qism (Temir Odam 3 - 2013)"
+        ]),
+        ("1002", "[📺 SERIYA] Kapitan Amerika (Captain America)", "🎬 **Kapitan Amerika barcha qismlari (1, 2, 3)**\n⭐ Reyting: 9.1/10\n📝 Stiv Rojersning 2-Jahon urushi va GIDRAga qarshi janglari.", "Jangari", [
+            "1-qism (Birinchi Qasoskor - 2011)",
+            "2-qism (Qishki Askar - 2014)",
+            "3-qism (Fuqarolar Urushi - 2016)"
+        ]),
+        ("1003", "[📺 SERIYA] Tor (Thor)", "🎬 **Tor barcha qismlari (1, 2, 3, 4)**\n⭐ Reyting: 9.0/10\n📝 Asgard shahzodasi Torning afsonaviy momaqaldiroq va xudolar jangi.", "Fantastika", [
+            "1-qism (Tor 1 - 2011)",
+            "2-qism (Zulmat Dunyosi - 2013)",
+            "3-qism (Ragnaryok - 2017)",
+            "4-qism (Sevgi va Momaqaldiroq - 2022)"
+        ]),
+        ("1004", "[📺 SERIYA] Qasoskorlar (The Avengers)", "🎬 **Qasoskorlar barcha qismlari (1, 2, 3, 4)**\n⭐ Reyting: 9.7/10\n📝 Tanos va koinot xavflariga qarshi buyuk qahramonlar birlashmasi.", "Jangari", [
+            "1-qism (The Avengers - 2012)",
+            "2-qism (Altron Asri - 2015)",
+            "3-qism (Cheksizlik Urushi - 2018)",
+            "4-qism (Intixoy Endgame - 2019)"
+        ]),
+        ("1005", "[📺 SERIYA] Forsaj (Fast & Furious)", "🎬 **Forsaj barcha qismlari (1 - 10)**\n⭐ Reyting: 9.0/10\n📝 Dom Toretto va poygachilar oilasining tezkor ko'cha sarguzashtlari.", "Jangari", [
+            "1-qism (Forsaj 1 - 2001)",
+            "2-qism (Forsaj 2 - 2003)",
+            "3-qism (Tokioda Poyga - 2006)",
+            "4-qism (Forsaj 4 - 2009)",
+            "5-qism (Forsaj 5 - 2011)",
+            "6-qism (Forsaj 6 - 2013)",
+            "7-qism (Forsaj 7 - 2015)",
+            "8-qism (Forsaj 8 - 2017)",
+            "9-qism (Forsaj 9 - 2021)",
+            "10-qism (Forsaj 10 - 2023)"
+        ]),
+        ("1006", "[📺 SERIYA] Garri Potter (Harry Potter)", "🎬 **Garri Potter barcha 8 ta qismi (1 - 7.2)**\n⭐ Reyting: 9.5/10\n📝 Xogvarts sehrgarlik maktabi va Lord Voldemortga qarshi buyuk jang.", "Fantastika", [
+            "1-qism (Falsafa Tosh - 2001)",
+            "2-qism (Sirlar Xonasi - 2002)",
+            "3-qism (Azkaban Mahbusi - 2004)",
+            "4-qism (Olov Qadahi - 2005)",
+            "5-qism (Feniks Jamiyati - 2007)",
+            "6-qism (Tola Qonli Shahzoda - 2009)",
+            "7-qism (Ajal Tuhfalari 1 - 2010)",
+            "8-qism (Ajal Tuhfalari 2 - 2011)"
+        ]),
+        ("1007", "[📺 SERIYA] Uyda Yolg'iz (Home Alone)", "🎬 **Uyda Yolg'iz barcha qismlari (1, 2, 3)**\n⭐ Reyting: 9.6/10\n📝 Kichik Kevinning Yangi Yil bayramida o'g'rilarga qarshi kulgili jangi.", "Komediya", [
+            "1-qism (Uyda Yolg'iz 1 - 1990)",
+            "2-qism (Nyu-Yorkda Yo'qolgan - 1992)",
+            "3-qism (Uyda Yolg'iz 3 - 1997)"
+        ]),
+        ("1008", "[📺 SERIYA] Muzlik Davri (Ice Age)", "🎬 **Muzlik Davri barcha qismlari (1 - 5)**\n⭐ Reyting: 9.0/10\n📝 Menni, Sid va Diyegoning muzlik davri kulgili sarguzashtlari.", "Multfilm", [
+            "1-qism (Muzlik Davri 1 - 2002)",
+            "2-qism (Global Erish - 2006)",
+            "3-qism (Dinozavrlar Asri - 2009)",
+            "4-qism (Qit'alar Surilishi - 2012)",
+            "5-qism (Toqnashuv - 2016)"
+        ]),
+        ("1009", "[📺 SERIYA] Shrek", "🎬 **Shrek barcha qismlari (1 - 4)**\n⭐ Reyting: 9.1/10\n📝 Yashil Shrek va Eshakning malika Fionani qutqarish komediyasi.", "Komediya", [
+            "1-qism (Shrek 1 - 2001)",
+            "2-qism (Shrek 2 - 2004)",
+            "3-qism (Shrek 3 - 2007)",
+            "4-qism (Umrbodga Abadiy - 2010)"
+        ]),
+        ("1010", "[📺 SERIYA] Kung Fu Panda", "🎬 **Kung Fu Panda barcha qismlari (1 - 4)**\n⭐ Reyting: 9.0/10\n📝 Semiz Panda Po va Ajdarho jangchisining jang san'ati sarguzashti.", "Multfilm", [
+            "1-qism (Kung Fu Panda 1 - 2008)",
+            "2-qism (Kung Fu Panda 2 - 2011)",
+            "3-qism (Kung Fu Panda 3 - 2016)",
+            "4-qism (Kung Fu Panda 4 - 2024)"
+        ]),
+        ("1011", "[📺 SERIYA] John Wick", "🎬 **John Wick barcha qismlari (1 - 4)**\n⭐ Reyting: 9.3/10\n📝 Afsonaviy qotil Jon Vikning Oliy Stolga qarshi qasos janglari.", "Jangari", [
+            "1-qism (John Wick 1 - 2014)",
+            "2-qism (John Wick 2 - 2017)",
+            "3-qism (Parabellum - 2019)",
+            "4-qism (John Wick 4 - 2023)"
+        ]),
+        ("1012", "[📺 SERIYA] Avatar", "🎬 **Avatar barcha qismlari (1, 2)**\n⭐ Reyting: 9.5/10\n📝 Jeyk Salli va Pandora sayyorasidagi ajoyib mo'jizalar.", "Fantastika", [
+            "1-qism (Avatar 1 - 2009)",
+            "2-qism (Suv Yo'li - 2022)"
+        ]),
+        ("1013", "[📺 SERIYA] Taksi (Taxi)", "🎬 **Taksi barcha qismlari (1 - 4)**\n⭐ Reyting: 9.0/10\n📝 Marseldagi eng tez taxsichi Daniel va Emilien poygalari.", "Komediya", [
+            "1-qism (Taksi 1 - 1998)",
+            "2-qism (Taksi 2 - 2000)",
+            "3-qism (Taksi 3 - 2003)",
+            "4-qism (Taksi 4 - 2007)"
+        ]),
+        ("1014", "[📺 SERIYA] Brat", "🎬 **Brat barcha qismlari (1, 2)**\n⭐ Reyting: 9.6/10\n📝 Danila Bagrovning haqqoniylik va akalik burchi adolat jangi.", "Jangari", [
+            "1-qism (Brat 1 - 1997)",
+            "2-qism (Brat 2 - 2000)"
+        ]),
+        ("1015", "[📺 SERIYA] Betmen (Batman)", "🎬 **Betmen Trilogiyasi (1, 2, 3)**\n⭐ Reyting: 9.9/10\n📝 Bryus Ueyn va Gotam shahridagi Joxer hamda Beynga qarshi jang.", "Jangari", [
+            "1-qism (Boshlanish - 2005)",
+            "2-qism (Qorong'u Ritsar - 2008)",
+            "3-qism (Afsona Qaytishi - 2012)"
+        ]),
+        ("1016", "[📺 SERIYA] Dedpul (Deadpool)", "🎬 **Dedpul barcha qismlari (1, 2, 3)**\n⭐ Reyting: 9.5/10\n📝 Ueyd Uilson va Volverin bilan hazilkash o'lmas janglar.", "Komediya", [
+            "1-qism (Dedpul 1 - 2016)",
+            "2-qism (Dedpul 2 - 2018)",
+            "3-qism (Dedpul va Volverin - 2024)"
+        ]),
+        ("1017", "[📺 SERIYA] Matritsa (The Matrix)", "🎬 **Matritsa barcha qismlari (1 - 4)**\n⭐ Reyting: 9.4/10\n📝 Neo va Agent Smit o'rtasidagi virtual va haqiqiy dunyo urushi.", "Fantastika", [
+            "1-qism (The Matrix - 1999)",
+            "2-qism (Qayta Yuklanish - 2003)",
+            "3-qism (Inqilob - 2003)",
+            "4-qism (Tirish - 2021)"
+        ]),
+        ("1018", "[📺 SERIYA] Terminator", "🎬 **Terminator barcha qismlari (1 - 6)**\n⭐ Reyting: 9.5/10\n📝 T-800 robotlari va Skaynet sun'iy intellekt urushi.", "Fantastika", [
+            "1-qism (Terminator 1 - 1984)",
+            "2-qism (Qiyomat Kuni - 1991)",
+            "3-qism (Mashinalar Isyoni - 2003)",
+            "4-qism (Qutqaruvchi Keladi - 2009)",
+            "5-qism (Genezis - 2015)",
+            "6-qism (Qorong'u Taqdir - 2019)"
+        ]),
+        ("1019", "[📺 SERIYA] Uzuklar Hukmdori (Lord of the Rings)", "🎬 **Uzuklar Hukmdori Trilogiyasi (1, 2, 3)**\n⭐ Reyting: 9.9/10\n📝 Frodo va Mordordagi Yagona Uzukni yo'q qilish missiyasi.", "Sehrli", [
+            "1-qism (Uzuk Jamiyati - 2001)",
+            "2-qism (Ikki Qal'a - 2002)",
+            "3-qism (Qirolning Qaytishi - 2003)"
+        ]),
+        ("1020", "[📺 SERIYA] Xobbit (The Hobbit)", "🎬 **Xobbit Trilogiyasi (1, 2, 3)**\n⭐ Reyting: 9.3/10\n📝 Bilbo Beggins va Ajdarho Smaug xazinasi sarguzashtlari.", "Sehrli", [
+            "1-qism (Kutilmagan Sayohat - 2012)",
+            "2-qism (Smaug Vayronagarchiligi - 2013)",
+            "3-qism (Besh Qo'shin Jangi - 2014)"
+        ]),
+        ("1021", "[📺 SERIYA] Karib Dengizi Qaroqchilari", "🎬 **Karib Qaroqchilari barcha qismlari (1 - 5)**\n⭐ Reyting: 9.5/10\n📝 Kapitan Djek Chittak va dengiz qaroqchilarining sehrli sarguzashtlari.", "Sarguzasht", [
+            "1-qism (Qora Marvarid - 2003)",
+            "2-qism (O'liklar Sandig'i - 2006)",
+            "3-qism (Dunyo Chetida - 2007)",
+            "4-qism (Noma'lum Qirg'oqlar - 2011)",
+            "5-qism (Salazar Qasosi - 2017)"
+        ]),
+        ("1022", "[📺 SERIYA] Qashqirlar Makoni", "🎬 **Qashqirlar Makoni filmlari**\n⭐ Reyting: 9.5/10\n📝 Polat Alemdarning Vatan va adolat yo'lidagi janglari.", "Jangari", [
+            "1-qism (Qashqirlar Makoni Iroq - 2006)",
+            "2-qism (Qashqirlar Makoni Gladio - 2009)",
+            "3-qism (Qashqirlar Makoni Vatan - 2017)"
+        ])
     ]
 
-    hollywood = [
-        ("1037", "Gladiator 1 (2000)", "🎬 **Gladiator 1**\n⭐ Reyting: 9.6/10\n📝 Tavsif: Maksimusning Rim imperatoriga qarshi qasosi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1038", "Gladiator 2 (2024)", "🎬 **Gladiator 2**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Lyutsiyning Kolizeydagi yangi qahramonlik jangi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1039", "Matritsa 1 (The Matrix)", "🎬 **Matritsa 1**\n⭐ Reyting: 9.7/10\n📝 Tavsif: Neo va virtual dunyo Matritsa haqiqati.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1040", "Matritsa 2: Qayta Yuklanish", "🎬 **Matritsa 2**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Zio'n shahrini saqlash va Arxitektor.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1041", "Matritsa 3: Inqilob", "🎬 **Matritsa 3**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Neo va Agent Smit o'rtasidagi so'nggi duel.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1042", "Terminator 1 (1984)", "🎬 **Terminator 1**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Sara Konnorni qutqarish uchun kelgan Kayl Riz.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1043", "Terminator 2: Qiyomat Kuni", "🎬 **Terminator 2**\n⭐ Reyting: 9.8/10\n📝 Tavsif: T-800 va T-1000 suyuq metall robot jangi.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1044", "Uzuklar Hukmdori 1: Uzuk Jamiyati", "🎬 **Uzuklar Hukmdori 1**\n⭐ Reyting: 9.8/10\n📝 Tavsif: Frodo va Yagona Uzukni yo'q qilish missiyasi.", "Sehrli", "🇺🇿 O'zbekcha"),
-        ("1045", "Uzuklar Hukmdori 2: Ikki Qal'a", "🎬 **Uzuklar Hukmdori 2**\n⭐ Reyting: 9.8/10\n📝 Tavsif: Xelmov Jaridagi buyuk qal'a jangi.", "Sehrli", "🇺🇿 O'zbekcha"),
-        ("1046", "Uzuklar Hukmdori 3: Qirolning Qaytishi", "🎬 **Uzuklar Hukmdori 3**\n⭐ Reyting: 9.9/10\n📝 Tavsif: Mordordagi hal qiluvchi buyuk zafar.", "Sehrli", "🇺🇿 O'zbekcha"),
-        ("1047", "Xobbit 1: Kutilmagan Sayohat", "🎬 **Xobbit 1**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Bilbo Beggins va 13 gnomning tog' sarguzashti.", "Sehrli", "🇺🇿 O'zbekcha"),
-        ("1048", "Xobbit 2: Smaug Vayronagarchiligi", "🎬 **Xobbit 2**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Ajdarho Smaug bilan uchrashuv.", "Sehrli", "🇺🇿 O'zbekcha"),
-        ("1049", "Xobbit 3: Besh Qo'shin Jangi", "🎬 **Xobbit 3**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Yolg'iz Tog' etagidagi besh qo'shin jangi.", "Sehrli", "🇺🇿 O'zbekcha"),
-        ("1050", "Ochlik O'yinlari 1", "🎬 **Ochlik O'yinlari 1**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Kitniss Everdin va 74-Ochlik o'yinlari.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1051", "Sumerki 1 (Toshqin)", "🎬 **Sumerki 1**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Bella Svon va Eduard Kalen vampir sevgisi.", "Melodrama", "🇺🇿 O'zbekcha"),
-        ("1052", "Bajarib Bo'lmas Missiya 1", "🎬 **Bajarib Bo'lmas Missiya 1**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Itan Xant va maxfiy ayg'oqchilik amaliyoti.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1053", "Transformatorlar 1", "🎬 **Transformatorlar 1**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Avtobotlar va Deseptikonlar Yer poygasi.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1054", "Muqaddima (Inception)", "🎬 **Inception**\n⭐ Reyting: 9.7/10\n📝 Tavsif: Tushlar ichidagi tushga fikr joylash missiyasi.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1055", "Tenet (2020)", "🎬 **Tenet**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Vaqt inversiyasi va 3-Jahon urushi xavfi.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1056", "Duna 1 (Dune)", "🎬 **Dune 1**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Arrakis qum sayyorasi va Pol Atreydes.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1057", "Duna 2 (Dune 2)", "🎬 **Dune 2**\n⭐ Reyting: 9.7/10\n📝 Tavsif: Fremenlar isyoni va imperatorga qarshi urush.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("1058", "Titanik (Titanic 1997)", "🎬 **Titanik**\n⭐ Reyting: 9.9/10\n📝 Tavsif: Jek va Rozaning unutilmas abadiy sevgisi.", "Melodrama", "🇺🇿 O'zbekcha"),
-        ("1059", "Karib Dengizi Qaroqchilari 1", "🎬 **Karib Qaroqchilari 1**\n⭐ Reyting: 9.6/10\n📝 Tavsif: Kapitan Djek Chittak va Qora Marvarid.", "Sarguzasht", "🇺🇿 O'zbekcha")
+    single_movies = [
+        ("1023", "Interstellar (2014)", "🎬 **Interstellar**\n⭐ Reyting: 9.2/10\n📝 Kosmik qora tuynuk va vaqt sayohati.", "Fantastika"),
+        ("1024", "Joker 1 (2019)", "🎬 **Joker**\n⭐ Reyting: 9.6/10\n📝 Artur Flekning fojiali psixologik o'zgarishi.", "Drama"),
+        ("1025", "Titanik (1997)", "🎬 **Titanik**\n⭐ Reyting: 9.9/10\n📝 Jek va Rozaning unutilmas abadiy sevgisi.", "Melodrama"),
+        ("1026", "Inception (2010)", "🎬 **Inception**\n⭐ Reyting: 9.7/10\n📝 Tushlar ichidagi tushga fikr joylash missiyasi.", "Fantastika"),
+        ("1027", "O'rgimchak Odam: Uyga Yo'l Yo'q", "🎬 **Spider-Man**\n⭐ Reyting: 9.3/10\n📝 Piter Parker va ko'p olamlar jangi.", "Jangari"),
+        ("1028", "Abdullajon (1991)", "🎬 **Abdullajon**\n⭐ Reyting: 9.8/10\n📝 O'zbek qishlog'iga tushgan o'zga sayyoralik.", "Komediya"),
+        ("1029", "Tangalik Bolalar (1990)", "🎬 **Tangalik Bolalar**\n⭐ Reyting: 9.7/10\n📝 Bolalikdagi samimiy va baxtiyor damlar.", "Komediya"),
+        ("1030", "Mahallada Duv-Duv Gap (1960)", "🎬 **Mahallada Duv-Duv Gap**\n⭐ Reyting: 9.9/10\n📝 O'zbek kinosining eng buyuk oltin komediyasi.", "Komediya"),
+        ("1031", "Super Kelinchak (2008)", "🎬 **Super Kelinchak**\n⭐ Reyting: 9.5/10\n📝 Zamonaviy kelin Diana va qaynona munosabatlari.", "Komediya"),
+        ("1032", "RRR (2022)", "🎬 **RRR**\n⭐ Reyting: 9.6/10\n📝 Hindiston ozodligi uchun ikki buyuk do'st jangi.", "Jangari"),
+        ("1033", "KGF 1 (2018)", "🎬 **KGF**\n⭐ Reyting: 9.5/10\n📝 Kolar oltin konlaridagi Rokki afsonasi.", "Jangari")
     ]
 
-    cartoons = [
-        ("1060", "Qirol Sher 1 (The Lion King)", "🎬 **Qirol Sher 1**\n⭐ Reyting: 9.8/10\n📝 Tavsif: Kichik Simba va Prayd yerlari shohligi.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1061", "Yovuz Men 1 (Despicable Me)", "🎬 **Despicable Me 1**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Gru va uning Minionlar jamoasi.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1062", "Madagaskar 1", "🎬 **Madagaskar 1**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Nyu-York hayvonot bog'idan qochgan do'stlar.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1063", "Tachki 1 (Cars)", "🎬 **Cars 1**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Poygachi Molniya Makkuin va Radiator Springs.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1064", "O'yinchoqlar Tarixi 1", "🎬 **Toy Story 1**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Vudi va Bazz Layter o'yinchoqlar siri.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1065", "Nemo Qidiruvida (Finding Nemo)", "🎬 **Finding Nemo**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Ummon tubidagi yo'qolgan Nemoni qidirish.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1066", "Super Oila 1 (The Incredibles)", "🎬 **The Incredibles**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Superqahramonlar oilasining maxfiy missiyasi.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1067", "Moana 1 (2016)", "🎬 **Moana 1**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Okean qizi Moana va yarim-xudo Maui.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1068", "Muzlagan Yurak 1 (Frozen)", "🎬 **Frozen 1**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Elsa va Anna op-singillarning sehrli sarguzashti.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1069", "Zootopiya 1 (Zootopia)", "🎬 **Zootopia 1**\n⭐ Reyting: 9.5/10\n📝 Tavsif: Quyon politsiyachi Djudi va tulki Nik.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1070", "Vall-I (WALL-E)", "🎬 **WALL-E**\n⭐ Reyting: 9.7/10\n📝 Tavsif: Koinotdagi kichik robotning buyuk sevgisi.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1071", "Yuqoriga (Up)", "🎬 **Up**\n⭐ Reyting: 9.6/10\n📝 Tavsif: Havo sharli uyda Janubiy Amerikaga sayohat.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1072", "Koko Sirlari (Coco)", "🎬 **Coco**\n⭐ Reyting: 9.7/10\n📝 Tavsif: Musiqachi Migel va Ajdodlar dunyosi.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1073", "Boshqotirma 1 (Inside Out)", "🎬 **Inside Out 1**\n⭐ Reyting: 9.4/10\n📝 Tavsif: Inson miyasidagi Quvonch va Qayg'u tuyg'ulari.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("1074", "Boshqotirma 2 (Inside Out 2)", "🎬 **Inside Out 2**\n⭐ Reyting: 9.6/10\n📝 Tavsif: O'smirlikdagi Xavotir va yangi tuyg'ular.", "Multfilm", "🇺🇿 O'zbekcha")
-    ]
-
-    uzbek = [
-        ("1075", "Abdullajon (1991)", "🎬 **Abdullajon**\n⭐ Reyting: 9.8/10\n📝 Tavsif: O'zbek qishlog'iga tushgan o'zga sayyoralik.", "Komediya", "🇺🇿 O'zbekcha"),
-        ("1076", "Tangalik Bolalar (1990)", "🎬 **Tangalik Bolalar**\n⭐ Reyting: 9.7/10\n📝 Tavsif: Bolalikdagi samimiy va baxtiyor damlar.", "Komediya", "🇺🇿 O'zbekcha"),
-        ("1077", "Mahallada Duv-Duv Gap (1960)", "🎬 **Mahallada Duv-Duv Gap**\n⭐ Reyting: 9.9/10\n📝 Tavsif: O'zbek kinosining eng buyuk oltin komediyasi.", "Komediya", "🇺🇿 O'zbekcha"),
-        ("1078", "Shum Bola (1977)", "🎬 **Shum Bola**\n⭐ Reyting: 9.9/10\n📝 Tavsif: Gafur G'ulom asari asosidagi sarguzasht.", "Komediya", "🇺🇿 O'zbekcha"),
-        ("1079", "Suyunchi (1982)", "🎬 **Suyunchi**\n⭐ Reyting: 9.7/10\n📝 Tavsif: Anzurat buvining qishloqdagi tartib-intizomi.", "Komediya", "🇺🇿 O'zbekcha"),
-        ("1080", "O'tkan Kunlar (1969)", "🎬 **O'tkan Kunlar**\n⭐ Reyting: 9.9/10\n📝 Tavsif: Otabek va Kumushning fojiali buyuk sevgisi.", "Tarixiy", "🇺🇿 O'zbekcha"),
-        ("1081", "Super Kelinchak (2008)", "🎬 **Super Kelinchak**\n⭐ Reyting: 9.5/10\n📝 Tavsif: Zamonaviy kelin Diana va qaynona munosabatlari.", "Komediya", "🇺🇿 O'zbekcha"),
-        ("1082", "Telba (2008)", "🎬 **Telba**\n⭐ Reyting: 9.4/10\n📝 Tavsif: Armonli va chinakam beg'ubor sevgi qissasi.", "Melodrama", "🇺🇿 O'zbekcha"),
-        ("1083", "Baron 1 (2016)", "🎬 **Baron 1**\n⭐ Reyting: 9.5/10\n📝 Tavsif: Narko-kardellarga qarshi xalqaro operatsiya.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("1084", "Scorpion (2018)", "🎬 **Scorpion**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Maxfiy xizmat zobitining xiyonatga qarshi jangi.", "Jangari", "🇺🇿 O'zbekcha")
-    ]
-
-    all_catalog = marvel_dc + hollywood + cartoons + uzbek
-    for code, title, caption, genre, lang in all_catalog:
+    for code, title, caption, genre, ep_list in unified_franchises:
         if not database.movie_exists_by_exact_title(title):
-            database.add_movie(code, title, caption, genre, random.randint(200, 990), lang)
-            print(f"✅ [Populated 200+] Added {title} (Code: {code})")
+            database.add_movie(code, title, caption, genre, 500, "🇺🇿 O'zbekcha")
+            for ep_title in ep_list:
+                database.add_episode(code, ep_title, "demo_file_id")
+            print(f"✅ [Franchise Clean] Added {title} (Code: {code})")
+
+    for code, title, caption, genre in single_movies:
+        if not database.movie_exists_by_exact_title(title):
+            database.add_movie(code, title, caption, genre, 500, "🇺🇿 O'zbekcha")
+            database.add_episode(code, "To'liq film", "demo_file_id")
 
 def extract_serial_info(raw_title, caption_text):
     """
