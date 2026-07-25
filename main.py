@@ -1689,6 +1689,9 @@ def text_handler(message):
         )
         return
 
+    # Process movie code or name search query
+    process_user_search_query(message)
+
 def process_user_search_query(message):
     user_id = message.from_user.id
     query_text = message.text.strip() if message.text else ""
