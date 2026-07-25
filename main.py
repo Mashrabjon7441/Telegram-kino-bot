@@ -12,8 +12,8 @@ import random
 # Initialize database
 database.init_db()
 
-# Initialize bot
-bot = telebot.TeleBot(config.BOT_TOKEN)
+# Initialize bot with high-concurrency 30-worker thread pool
+bot = telebot.TeleBot(config.BOT_TOKEN, threaded=True, num_threads=30)
 
 # Genres list
 GENRES = ["💥 Jangari", "😂 Komediya", "❤️ Melodrama", "🦁 Multfilm", "🚀 Fantastika", "👻 Qo'rqinchli", "🎭 Drama", "🌐 Boshqa"]
