@@ -111,8 +111,11 @@ def get_admin_keyboard(user_id):
     is_paused = database.get_setting('telethon_scraper_paused') == '1'
     btn_pause = types.KeyboardButton("▶️ Avto-Yuklashni Davom Ettirish") if is_paused else types.KeyboardButton("⏸️ Avto-Yuklashni Vaqtincha To'xtatish")
 
+    btn_auto_indexer = types.KeyboardButton("📥 Videolarni Forward Qilish (Avto-Baza)")
+
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
+    keyboard.row(btn_auto_indexer)
     keyboard.row(btn_queue, btn_source_ch)
     keyboard.row(btn_web_search)
     keyboard.row(btn_userbot)
@@ -1008,6 +1011,87 @@ def inline_query_handler(query):
 
     bot.answer_inline_query(query.id, results, cache_time=1)
 
+# Direct Video Upload / Forward Auto-Indexer Handler for Admins
+@bot.message_handler(content_types=['video', 'document'])
+def handle_private_video_or_doc(message):
+    user_id = message.from_user.id
+    if not is_admin(user_id):
+        return
+
+    if not is_valid_video_file(message):
+        return
+
+    file_id = None
+    if message.video:
+        file_id = message.video.file_id
+    elif message.document:
+        file_id = message.document.file_id
+
+    if not file_id:
+        return
+
+    caption = message.caption or ""
+    file_name = (getattr(message.document, 'file_name', '') or getattr(message.video, 'file_name', '') or '').strip()
+    raw_title = caption or file_name or "Yangi Kino Video"
+
+    import re
+    # Clean ads, URLs, @usernames, tags, and extensions
+    raw_title = re.sub(r'https?://\S+', '', raw_title)
+    raw_title = re.sub(r'@[A-Za-z0-9_]+', '', raw_title)
+    raw_title = re.sub(r'\.mp4|\.mkv|\.avi|\.mov|\.webm', '', raw_title, flags=re.IGNORECASE)
+    raw_title = raw_title.strip()
+
+    if not raw_title:
+        raw_title = "Yangi Kino Video"
+
+    # Check if caption contains explicit 4-digit code (e.g. 1020)
+    code_match = re.search(r'\b\d{4}\b', caption)
+    if code_match:
+        target_code = code_match.group(0)
+        movie = database.get_movie(target_code)
+        if movie:
+            database.add_episode(target_code, "To'liq film", file_id)
+            bot.send_message(
+                message.chat.id,
+                f"✅ **[VIDEO BAZAGA BIRIKTIRILDI]**\n\n"
+                f"🎬 **Nomi:** {movie[1]}\n"
+                f"🔑 **Kino kodi:** `{target_code}`\n\n"
+                f"📌 Video fayli Cloud PostgreSQL bazasiga umrbodga saqlandi!",
+                parse_mode="Markdown"
+            )
+            return
+
+    # Serial vs Movie Grouping
+    is_serial, base_title, episode_title = extract_serial_info(raw_title, caption)
+
+    # Check existing base title in Cloud Database
+    existing_movie = database.find_movie_by_base_title(base_title)
+    if existing_movie:
+        movie_code = existing_movie[0]
+        database.add_episode(movie_code, episode_title, file_id)
+        bot.send_message(
+            message.chat.id,
+            f"✅ **[YANGI QISM SAQLANDI]**\n\n"
+            f"🎬 **Nomi:** {base_title}\n"
+            f"📌 **Qismi:** {episode_title}\n"
+            f"🔑 **Kino kodi:** `{movie_code}`\n\n"
+            f"📌 Cloud PostgreSQL bazasiga umrbodga saqlandi!",
+            parse_mode="Markdown"
+        )
+    else:
+        movie_code = generate_unique_code()
+        full_title = f"[📺 SERIAL] {base_title}" if is_serial else base_title
+        database.add_movie(movie_code, full_title, caption, "Umumiy", 0, "🇺🇿 O'zbekcha")
+        database.add_episode(movie_code, episode_title, file_id)
+        bot.send_message(
+            message.chat.id,
+            f"🎉 **[YANGI KINO AUTO-SAQLANDI]**\n\n"
+            f"🎬 **Nomi:** {base_title}\n"
+            f"🔑 **Biriktirilgan 4-xonali Kod:** `{movie_code}`\n\n"
+            f"📌 Video fayli va 4-xonali unikal kodi Cloud PostgreSQL bazasiga umrbodga saqlandi!",
+            parse_mode="Markdown"
+        )
+
 # Text messages handler
 @bot.message_handler(func=lambda msg: True)
 def text_handler(message):
@@ -1194,6 +1278,17 @@ def text_handler(message):
 
     elif text == "⚙️ Admin panel" and is_admin(user_id):
         bot.send_message(message.chat.id, "Admin panelga xush kelibsiz. Amalni tanlang:", reply_markup=get_admin_keyboard(user_id))
+        return
+
+    elif text == "📥 Videolarni Forward Qilish (Avto-Baza)" and is_admin(user_id):
+        msg = (
+            "📥 **AVTOMATIK CHAT/KANAL VIDEOLARINI BAZAGA ULASH:**\n\n"
+            "👍 **Ikkinchi akaunt yoki Telethon SHART EMAS!**\n\n"
+            "📌 **Qanday ishlatiladi?**\n"
+            "1. Kinolaringiz bor Telegram kanalingizdan yoki chatlaringizdan videolarni **shunchaki ushbu bot chatiga Forward qiling (yoki videolarni yuboring)!**\n"
+            "2. Bot har bir video uchun **4 xonali unikal kod** yaratadi, reklama va keraksiz yozuvlarni avtomatik tozalaydi hamda Cloud PostgreSQL bazasiga umrbodga saqlab qo'yadi! 🚀"
+        )
+        bot.send_message(message.chat.id, msg, parse_mode="Markdown")
         return
 
     elif text == "⬅️ Bosh sahifa":
