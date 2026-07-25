@@ -2597,31 +2597,80 @@ def auto_movie_scout_worker():
 
 
 def force_initial_movie_population():
-    """Populates top popular movies immediately if database has fewer than 10 movies"""
-    movies = database.get_all_movies()
-    if movies and len(movies) >= 10:
-        return
-
+    """Populates all sequel parts of popular franchises immediately into Cloud PostgreSQL"""
     top_catalog = [
-        ("4810", "Avatar: Suv Yo'li (2022)", "🎬 **Avatar 2**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Pandora dunyosidagi ajoyib sarguzashtlar.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("4811", "Interstellar (2014)", "🎬 **Interstellar**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Kosmos va vaqt bo'ylab insoniyatni qutqarish missiyasi.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("4812", "Forsaj 10 (2023)", "🎬 **Forsaj 10**\n⭐ Reyting: 8.5/10\n📝 Tavsif: Dom Toretto va uning jamoasining eng xavfli poyga missiyasi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("4813", "Garri Potter va Falsafa Tosh (2001)", "🎬 **Garri Potter 1**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Sehrgarlik maktabi Xogvarts va Garri Potterning sirli sarguzashtlari.", "Fantastika", "🇺🇿 O'zbekcha"),
-        ("4814", "Shrek 1 (2001)", "🎬 **Shrek 1**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Yashil maxluq Shrek va Eshakning qahramonlik sarguzashtlari.", "Komediya", "🇺🇿 O'zbekcha"),
-        ("4815", "Uyda Yolg'iz 1 (1990)", "🎬 **Uyda Yolg'iz 1**\n⭐ Reyting: 9.5/10\n📝 Tavsif: Kichkina Kevin yangi yil bayramida uyda yolg'iz qolib o'g'rilarga qarshi kurashadi.", "Komediya", "🇺🇿 O'zbekcha"),
-        ("4816", "Uyda Yolg'iz 2 (1992)", "🎬 **Uyda Yolg'iz 2**\n⭐ Reyting: 9.4/10\n📝 Tavsif: Kevin Nyu-Yorkda adashib qoladi va o'g'rilar bilan qayta toqnash keladi.", "Komediya", "🇺🇿 O'zbekcha"),
-        ("4817", "Muzlik Davri 1 (2002)", "🎬 **Muzlik Davri 1**\n⭐ Reyting: 8.7/10\n📝 Tavsif: Mamont Menni, Yo'lbars Diyego va Leni muzlik davrida inson chaqaloqini qutqaradi.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("4818", "Kung Fu Panda 1 (2008)", "🎬 **Kung Fu Panda 1**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Dangasa semiz panda Po ajdarho jangchisiga aylanadi.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("4819", "Grinch (2018)", "🎬 **Grinch**\n⭐ Reyting: 8.6/10\n📝 Tavsif: Yashil Grinch Yangi Yil bayramini o'g'irlamoqchi bo'ladi.", "Multfilm", "🇺🇿 O'zbekcha"),
-        ("4820", "John Wick 4 (2023)", "🎬 **John Wick 4**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Afsonaviy qotil Jon Vik Oliy Stolga qarshi hal qiluvchi jangni boshlaydi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("4821", "O'rgimchak Odam: Uyga Yo'l Yo'q (2021)", "🎬 **Spider-Man**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Piter Parker barcha koinotlardan kelgan dushmanlarga qarshi kurashadi.", "Jangari", "🇺🇿 O'zbekcha"),
-        ("4822", "Joker (2019)", "🎬 **Joker**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Artur Flekning Gotam shahridagi fojiali va psixologik o'zgarishi.", "Drama", "🇺🇿 O'zbekcha")
+        # Garri Potter Franchise
+        ("4810", "Garri Potter 1 va Falsafa Tosh (2001)", "🎬 **Garri Potter 1**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Sehrgarlik maktabi Xogvarts va Garri Potterning sirli sarguzashtlari.", "Fantastika", "🇺🇿 O'zbekcha"),
+        ("4811", "Garri Potter 2 va Sirlar Xonasi (2002)", "🎬 **Garri Potter 2**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Xogvartsda ochilgan sirlar xonasi va iblis maxluq.", "Fantastika", "🇺🇿 O'zbekcha"),
+        ("4812", "Garri Potter 3 va Azkaban Mahbusi (2004)", "🎬 **Garri Potter 3**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Azkaban qamoqxonasidan qochgan Siriyus Blek siri.", "Fantastika", "🇺🇿 O'zbekcha"),
+        ("4813", "Garri Potter 4 va Olov Qadahi (2005)", "🎬 **Garri Potter 4**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Uch Sehrgar musobaqasi va Lord Voldemortning qaytishi.", "Fantastika", "🇺🇿 O'zbekcha"),
+        ("4814", "Garri Potter 5 va Feniks Jamiyati (2007)", "🎬 **Garri Potter 5**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Sehrgarlik vazirligiga qarshi Feniks jamiyati jangi.", "Fantastika", "🇺🇿 O'zbekcha"),
+        ("4815", "Garri Potter 6 va Tola Qonli Shahzoda (2009)", "🎬 **Garri Potter 6**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Voldemortning sirli Kreststraj sirlari.", "Fantastika", "🇺🇿 O'zbekcha"),
+        ("4816", "Garri Potter 7 (1-qism) va Ajal Tuhfalari (2010)", "🎬 **Garri Potter 7 (1-qism)**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Kreststrajlarni qidirishdagi so'nggi xavfli sayohat.", "Fantastika", "🇺🇿 O'zbekcha"),
+        ("4817", "Garri Potter 7 (2-qism) va Ajal Tuhfalari (2011)", "🎬 **Garri Potter 7 (2-qism)**\n⭐ Reyting: 9.5/10\n📝 Tavsif: Xogvarts uchun hal qiluvchi so'nggi jang.", "Fantastika", "🇺🇿 O'zbekcha"),
+
+        # Forsaj Franchise
+        ("4818", "Forsaj 1 (2001)", "🎬 **Forsaj 1**\n⭐ Reyting: 8.7/10\n📝 Tavsif: Dom Toretto va Brayan O'Konnerning ko'cha poygalari.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4819", "Forsaj 2 (2003)", "🎬 **Forsaj 2**\n⭐ Reyting: 8.6/10\n📝 Tavsif: Mayamidagi xavfli poygalar va noqonuniy missiyalar.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4820", "Forsaj 3: Tokioda Poyga (2006)", "🎬 **Forsaj 3**\n⭐ Reyting: 8.5/10\n📝 Tavsif: Tokio ko'chalaridagi drift poygalari va Xan.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4821", "Forsaj 4 (2009)", "🎬 **Forsaj 4**\n⭐ Reyting: 8.6/10\n📝 Tavsif: Dom va Brayan narko-kardelga qarshi birlashadi.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4822", "Forsaj 5 (2011)", "🎬 **Forsaj 5**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Rio-de-Janeyroda 100 million dollarlik seyf o'g'irligi.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4823", "Forsaj 6 (2013)", "🎬 **Forsaj 6**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Ouen Shou jamoasiga qarshi tank va samolyot jangi.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4824", "Forsaj 7 (2015)", "🎬 **Forsaj 7**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Dekard Shouga qarshi qasos va Brayan bilan xayrlashuv.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4825", "Forsaj 8 (2017)", "🎬 **Forsaj 8**\n⭐ Reyting: 8.7/10\n📝 Tavsif: Sayfer Domni xiyonat qilishga majbur qiladi.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4826", "Forsaj 9 (2021)", "🎬 **Forsaj 9**\n⭐ Reyting: 8.5/10\n📝 Tavsif: Domning tug'ishgan ukasi Yakob Toretto paydo bo'ladi.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4827", "Forsaj 10 (2023)", "🎬 **Forsaj 10**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Dante Reysning qasos missiyasi va Dom oilasi.", "Jangari", "🇺🇿 O'zbekcha"),
+
+        # Uyda Yolg'iz Franchise
+        ("4828", "Uyda Yolg'iz 1 (1990)", "🎬 **Uyda Yolg'iz 1**\n⭐ Reyting: 9.5/10\n📝 Tavsif: Kichkina Kevin Yangi Yilda uyda yolg'iz qoladi.", "Komediya", "🇺🇿 O'zbekcha"),
+        ("4829", "Uyda Yolg'iz 2: Nyu-Yorkda Yo'qolgan (1992)", "🎬 **Uyda Yolg'iz 2**\n⭐ Reyting: 9.4/10\n📝 Tavsif: Kevin Nyu-York mehmonxonasida o'g'rilarga qarshi.", "Komediya", "🇺🇿 O'zbekcha"),
+        ("4830", "Uyda Yolg'iz 3 (1997)", "🎬 **Uyda Yolg'iz 3**\n⭐ Reyting: 8.4/10\n📝 Tavsif: Kichik Aleks maxfiy chipni o'g'irlagan ayg'oqchilardan uyni qutqaradi.", "Komediya", "🇺🇿 O'zbekcha"),
+
+        # Muzlik Davri Franchise
+        ("4831", "Muzlik Davri 1 (2002)", "🎬 **Muzlik Davri 1**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Menni, Diyego va Sid inson chaqaloqini qutqaradi.", "Multfilm", "🇺🇿 O'zbekcha"),
+        ("4832", "Muzlik Davri 2: Global Erish (2006)", "🎬 **Muzlik Davri 2**\n⭐ Reyting: 8.7/10\n📝 Tavsif: Muzliklar erishini to'xtatish sarguzashtlari.", "Multfilm", "🇺🇿 O'zbekcha"),
+        ("4833", "Muzlik Davri 3: Dinozavrlar Asri (2009)", "🎬 **Muzlik Davri 3**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Yer osti dinozavrlar dunyosidagi sarguzasht.", "Multfilm", "🇺🇿 O'zbekcha"),
+        ("4834", "Muzlik Davri 4: Qit'alar Surilishi (2012)", "🎬 **Muzlik Davri 4**\n⭐ Reyting: 8.6/10\n📝 Tavsif: Qaroqchi kemalar va qit'alarning ajralishi.", "Multfilm", "🇺🇿 O'zbekcha"),
+        ("4835", "Muzlik Davri 5: Toqnashuv (2016)", "🎬 **Muzlik Davri 5**\n⭐ Reyting: 8.4/10\n📝 Tavsif: Meteorit xavfidan dunyoni qutqarish missiyasi.", "Multfilm", "🇺🇿 O'zbekcha"),
+
+        # Shrek & Kung Fu Panda Franchise
+        ("4836", "Shrek 1 (2001)", "🎬 **Shrek 1**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Shrek va Eshakning malika Fionani qutqarishi.", "Komediya", "🇺🇿 O'zbekcha"),
+        ("4837", "Shrek 2 (2004)", "🎬 **Shrek 2**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Uzoq Uzoq Qirollik va Pari Oila sirlari.", "Komediya", "🇺🇿 O'zbekcha"),
+        ("4838", "Shrek 3: Uchinchi (2007)", "🎬 **Shrek 3**\n⭐ Reyting: 8.5/10\n📝 Tavsif: Qirollik taxti va Shahzoda Charming xujumi.", "Komediya", "🇺🇿 O'zbekcha"),
+        ("4839", "Shrek 4: Umrbodga Abadiy (2010)", "🎬 **Shrek 4**\n⭐ Reyting: 8.6/10\n📝 Tavsif: Rumpelshtiltsxen va muqobil dunyo siri.", "Komediya", "🇺🇿 O'zbekcha"),
+
+        ("4840", "Kung Fu Panda 1 (2008)", "🎬 **Kung Fu Panda 1**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Panda Po Ajdarho jangchisiga aylanadi.", "Multfilm", "🇺🇿 O'zbekcha"),
+        ("4841", "Kung Fu Panda 2 (2011)", "🎬 **Kung Fu Panda 2**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Lord Shen va zambarak qurollariga qarshi jang.", "Multfilm", "🇺🇿 O'zbekcha"),
+        ("4842", "Kung Fu Panda 3 (2016)", "🎬 **Kung Fu Panda 3**\n⭐ Reyting: 8.7/10\n📝 Tavsif: Kay va Ruhlar dunyosidan kelgan dushman.", "Multfilm", "🇺🇿 O'zbekcha"),
+        ("4843", "Kung Fu Panda 4 (2024)", "🎬 **Kung Fu Panda 4**\n⭐ Reyting: 8.6/10\n📝 Tavsif: Xameleon jodugarga qarshi yangi ma'naviy yo'l.", "Multfilm", "🇺🇿 O'zbekcha"),
+
+        # John Wick & Avatar Franchise
+        ("4844", "John Wick 1 (2014)", "🎬 **John Wick 1**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Afsonaviy qotil Jon Vikning qasos missiyasi.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4845", "John Wick 2 (2017)", "🎬 **John Wick 2**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Rimdagi Kontinental mehmonxonasi va qonli qasam.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4846", "John Wick 3: Parabellum (2019)", "🎬 **John Wick 3**\n⭐ Reyting: 9.0/10\n📝 Tavsif: 14 million dollarlik mukofot va qochish.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4847", "John Wick 4 (2023)", "🎬 **John Wick 4**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Oliy Stolga qarshi hal qiluvchi duel.", "Jangari", "🇺🇿 O'zbekcha"),
+
+        ("4848", "Avatar 1 (2009)", "🎬 **Avatar 1**\n⭐ Reyting: 9.4/10\n📝 Tavsif: Jeyk Salli va Pandora sayyorasi sirlari.", "Fantastika", "🇺🇿 O'zbekcha"),
+        ("4849", "Avatar 2: Suv Yo'li (2022)", "🎬 **Avatar 2**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Okean qabilasi Metkayina va suvlardagi jang.", "Fantastika", "🇺🇿 O'zbekcha"),
+
+        # Brat & Taksi & Interstellar
+        ("4850", "Brat 1 (1997)", "🎬 **Brat 1**\n⭐ Reyting: 9.3/10\n📝 Tavsif: Danila Bagrov Peterburgdagi haqqoniylik va akalik burchi.", "Jangari", "🇷🇺 Ruscha"),
+        ("4851", "Brat 2 (2000)", "🎬 **Brat 2**\n⭐ Reyting: 9.5/10\n📝 Tavsif: Danila Bagrov Amerikadagi adolat va 'Kuchi nimada?' savoli.", "Jangari", "🇷🇺 Ruscha"),
+
+        ("4852", "Taksi 1 (1998)", "🎬 **Taksi 1**\n⭐ Reyting: 8.9/10\n📝 Tavsif: Marseldagi eng tez taxsichi Daniel va politsiyachi Emilien.", "Komediya", "🇺🇿 O'zbekcha"),
+        ("4853", "Taksi 2 (2000)", "🎬 **Taksi 2**\n⭐ Reyting: 8.8/10\n📝 Tavsif: Yaponiyalik generalni qutqarish missiyasi.", "Komediya", "🇺🇿 O'zbekcha"),
+        ("4854", "Taksi 3 (2003)", "🎬 **Taksi 3**\n⭐ Reyting: 8.6/10\n📝 Tavsif: Qorbobo kiyimidagi o'g'rilarga qarshi poyga.", "Komediya", "🇺🇿 O'zbekcha"),
+        ("4855", "Taksi 4 (2007)", "🎬 **Taksi 4**\n⭐ Reyting: 8.5/10\n📝 Tavsif: Belgiyalik eng xavfli jinoyatchining qochishi.", "Komediya", "🇺🇿 O'zbekcha"),
+
+        ("4856", "Interstellar (2014)", "🎬 **Interstellar**\n⭐ Reyting: 9.2/10\n📝 Tavsif: Kosmik qora tuynuk va vaqt sayohati.", "Fantastika", "🇺🇿 O'zbekcha"),
+        ("4857", "Qashqirlar Makoni: Vatan (2017)", "🎬 **Qashqirlar Makoni Vatan**\n⭐ Reyting: 9.1/10\n📝 Tavsif: Polat Alemdarning Vatanni qutqarish missiyasi.", "Jangari", "🇺🇿 O'zbekcha"),
+        ("4858", "Qashqirlar Makoni: Iroq (2006)", "🎬 **Qashqirlar Makoni Iroq**\n⭐ Reyting: 9.0/10\n📝 Tavsif: Iroqdagi adolat va turk zobitlari jangi.", "Jangari", "🇺🇿 O'zbekcha")
     ]
 
     for code, title, caption, genre, lang in top_catalog:
         if not database.movie_exists_by_exact_title(title):
             database.add_movie(code, title, caption, genre, random.randint(150, 990), lang)
-            print(f"✅ [Instant Auto-Populate] Added {title} (Code: {code})")
+            print(f"✅ [Franchise Auto-Populate] Added {title} (Code: {code})")
 
 def extract_serial_info(raw_title, caption_text):
     """
