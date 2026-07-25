@@ -2376,22 +2376,13 @@ def auto_movie_scout_worker():
 
 
 def force_initial_movie_population():
-    """Ensure DB has an initial batch of popular Uzbek & Russian movies instantly"""
-    initial_movies = [
-        ("1010", "Аватар: Путь воды (2022)", "Аватар 2 - Пандора оламидаги янги саргузаштлар.\n\n⭐ Reyting: 8.4/10", "🚀 Fantastika", "🇷🇺 Ruscha (На русском)"),
-        ("1020", "Брат 2 (2000)", "Сергей Бодров - Брат 2 афсонавий кинофильми.\n\n⭐ Reyting: 8.2/10", "💥 Jangari", "🇷🇺 Ruscha (На русском)"),
-        ("1030", "Qashqirlar Makoni Vatan (2011)", "Полат Алемдар - Восстание и защита Родины.\n\n⭐ Reyting: 8.5/10", "💥 Jangari", "🇺🇿 O'zbekcha"),
-        ("1040", "Гарри Поттер и философский камень", "Гарри Поттернинг Хогвартсдаги илк йили.\n\n⭐ Reyting: 8.8/10", "🚀 Fantastika", "🇷🇺 Ruscha (На русском)"),
-        ("1050", "Форсаж 10 (Fast X)", "Доминик Торетто ва унинг оиласининг янги пойгаси.\n\n⭐ Reyting: 8.0/10", "💥 Jangari", "🇺🇿 O'zbekcha"),
-        ("1060", "Шрек (Cartoon)", "Шрек ва Эшакнинг қизиқарли ва кулгили саргузаштлари.\n\n⭐ Reyting: 8.9/10", "🦁 Multfilm", "🇺🇿 O'zbekcha")
-    ]
-    for code, title, caption, genre, lang in initial_movies:
-        if not database.get_movie(code):
-            database.add_movie(code, title, caption, genre, 15, lang)
-            # Make top ones VIP
-            if code in ["1010", "1030"]:
-                database.set_movie_vip(code, True)
-            print(f"✅ Initial batch force-added: {title} (Code: {code})")
+    """Clean empty database for real user content only. Auto-deletes old hardcoded demo movies."""
+    demo_codes = ["1010", "1020", "1030", "1040", "1050", "1060"]
+    for code in demo_codes:
+        movie = database.get_movie(code)
+        if movie and any(demo_name in movie[1] for demo_name in ["Аватар", "Брат 2", "Qashqirlar Makoni Vatan", "Гарри Поттер", "Форсаж 10", "Шрек"]):
+            database.delete_movie(code)
+            print(f"🗑️ [Demo Cleaned] Removed hardcoded demo movie: {code} - {movie[1]}")
 
 def extract_serial_info(raw_title, caption_text):
     """
