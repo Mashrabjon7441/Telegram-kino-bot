@@ -272,10 +272,6 @@ def init_db():
         conn.commit()
         conn.close()
         migrate_sqlite_to_postgres()
-        try:
-            auto_merge_sequels_and_parts()
-        except Exception as e:
-            print(f"Auto-merge sequels error: {e}")
         return
 
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='episodes';")
@@ -1310,39 +1306,8 @@ def trigger_auto_backup(bot_instance):
     pass
 
 def auto_merge_sequels_and_parts():
-    """Finds movies with similar base titles (e.g. Uyda yolg'iz 1, Uyda yolg'iz 2) and merges them into 1 movie code with multiple episode parts"""
-    import re
-    movies = get_all_movies()
-    if not movies or len(movies) < 2:
-        return 0
-
-    groups = {}
-    for code, title in movies:
-        raw_t = re.sub(r'\[.*?\]|\(.*?\)|<.*?>', '', title).replace('[📺 SERIAL]', '').strip()
-        base_t = re.sub(r'\s+\d+$|\d+\s*-\s*qism|\d+\s*qism', '', raw_t, flags=re.IGNORECASE).strip()
-        if not base_t:
-            base_t = title.strip()
-        if base_t not in groups:
-            groups[base_t] = []
-        groups[base_t].append((code, title))
-
-    merged_count = 0
-    for base_t, movie_list in groups.items():
-        if len(movie_list) > 1:
-            primary_code, primary_title = movie_list[0]
-            clean_primary_title = f"[📺 SERIAL] {base_t}"
-            execute_query("UPDATE movies SET title = ? WHERE code = ?", (clean_primary_title, primary_code), commit=True)
-
-            for i, (code, title) in enumerate(movie_list):
-                num_match = re.search(r'(\d+)', title)
-                ep_name = f"{num_match.group(1)}-qism" if num_match else f"{i+1}-qism"
-
-                if code != primary_code:
-                    execute_query("UPDATE episodes SET movie_code = ? WHERE movie_code = ?", (primary_code, code), commit=True)
-                    execute_query("DELETE FROM movies WHERE code = ?", (code,), commit=True)
-                    merged_count += 1
-
-    return merged_count
+    """Disabled automatic merging to prevent accidental grouping of distinct movies."""
+    return 0
 
 
 # ----------------- PENDING QUEUE HELPERS -----------------

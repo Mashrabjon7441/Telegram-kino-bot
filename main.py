@@ -2678,31 +2678,26 @@ def extract_serial_info(raw_title, caption_text):
                 pass
 
     clean_base = raw_title
-    # Strip resolution, quality tags first
-    clean_base = re.sub(r'\[.*?\]|\(.*?\)|<.*?>', '', clean_base)
+    clean_base = re.sub(r'\[.*?\]|\(.*?\)|<.*?>', '', clean_base).strip()
 
     strip_pats = [
         r'\d+\s*-\s*qism', r'\d+\s*qism', r'qism\s*\d+',
         r'\d+\s*-\s*серия', r'\d+\s*серия', r'серия\s*\d+',
         r'e\d+', r's\d+e\d+', r'part\s*\d+', r'ep\s*\d+',
-        r'\d+\s*-\s*сезон', r'\d+\s*сезон', r'сезон\s*\d+',
-        r'\s+\d+$'  # Strip trailing digits like " 1", " 2"
+        r'\d+\s*-\s*сезон', r'\d+\s*сезон', r'сезон\s*\d+'
     ]
     for pat in strip_pats:
         clean_base = re.sub(pat, '', clean_base, flags=re.IGNORECASE)
 
-    clean_base = re.sub(r'[\(\)\[\]#\-:]+', ' ', clean_base)
-    clean_base = " ".join([w for w in clean_base.split() if not w.startswith('#')])
     clean_base = clean_base.strip()
-
     if not clean_base:
         clean_base = raw_title.strip()
 
-    is_serial = (ep_num is not None) or any(w in text_lower for w in ['qism', 'серия', 'сезон', 'serial', '#serial']) or (ep_num and ep_num > 0)
+    is_serial = (ep_num is not None) or any(w in text_lower for w in ['qism', 'серия', 'сезон', 'serial', '#serial'])
     if not is_serial:
         ep_title = "To'liq film"
 
-    return is_serial, clean_base, ep_title
+    return is_serial, raw_title.strip(), ep_title
 
 
 def is_valid_video_file(msg):
