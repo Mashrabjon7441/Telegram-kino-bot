@@ -846,6 +846,32 @@ def movie_exists_by_exact_title(title):
     conn.close()
     return res is not None
 
+def find_movie_by_base_title(base_title):
+    if not base_title or len(base_title.strip()) < 2:
+        return None
+    clean = base_title.strip()
+    
+    res = execute_query(
+        "SELECT code, title, caption, genre FROM movies WHERE LOWER(title) LIKE LOWER(?) OR LOWER(title) LIKE LOWER(?) LIMIT 1",
+        (f"%{clean}%", f"{clean}%"),
+        fetchone=True
+    )
+    if res:
+        return res
+    
+    words = clean.split()
+    if len(words) >= 2:
+        short_title = " ".join(words[:2])
+        res = execute_query(
+            "SELECT code, title, caption, genre FROM movies WHERE LOWER(title) LIKE LOWER(?) LIMIT 1",
+            (f"%{short_title}%",),
+            fetchone=True
+        )
+        if res:
+            return res
+            
+    return None
+
 def search_movies_by_name(query):
     conn = sqlite3.connect(DB_NAME, timeout=30.0)
     cursor = conn.cursor()
