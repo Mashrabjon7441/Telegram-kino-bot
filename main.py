@@ -2687,10 +2687,15 @@ if __name__ == '__main__':
 
     while True:
         try:
-            bot.polling(non_stop=True, interval=0, timeout=30, skip_pending=False)
+            bot.polling(non_stop=True, interval=1, timeout=20, skip_pending=False)
         except Exception as e:
-            print(f"Polling conflict or exception ({e}). Retrying polling...")
-            time.sleep(3)
+            err_str = str(e)
+            if "409" in err_str or "Conflict" in err_str:
+                print("⚠️ [Polling Conflict 409] Old container instance shutting down. Waiting 10s for clean release...")
+                time.sleep(10)
+            else:
+                print(f"Polling exception ({e}). Retrying in 4s...")
+                time.sleep(4)
 
 
 
