@@ -1309,44 +1309,30 @@ def trigger_auto_backup(bot_instance):
 # ----------------- PENDING QUEUE HELPERS -----------------
 
 def add_to_pending_queue(file_id, title="", caption=""):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT COALESCE(MAX(queue_num), 0) + 1 FROM pending_queue")
-    next_num = cursor.fetchone()[0]
-    cursor.execute(
+    res = execute_query("SELECT COALESCE(MAX(queue_num), 0) + 1 FROM pending_queue", fetchone=True)
+    next_num = res[0] if res else 1
+    execute_query(
         "INSERT INTO pending_queue (queue_num, file_id, title, caption, status) VALUES (?, ?, ?, ?, 'pending')",
-        (next_num, file_id, title, caption)
+        (next_num, file_id, title, caption),
+        commit=True
     )
-    conn.commit()
-    conn.close()
     return next_num
 
 def get_pending_queue_count():
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM pending_queue WHERE status = 'pending'")
-    count = cursor.fetchone()[0]
-    conn.close()
-    return count
+    res = execute_query("SELECT COUNT(*) FROM pending_queue WHERE status = 'pending'", fetchone=True)
+    return res[0] if res else 0
 
 def get_next_pending_video():
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, queue_num, file_id, title, caption FROM pending_queue WHERE status = 'pending' ORDER BY queue_num ASC LIMIT 1")
-    res = cursor.fetchone()
-    conn.close()
-    return res
+    return execute_query("SELECT id, queue_num, file_id, title, caption FROM pending_queue WHERE status = 'pending' ORDER BY queue_num ASC LIMIT 1", fetchone=True)
 
+def get_all_pending_videos():
+    return execute_query("SELECT id, queue_num, file_id, title, caption FROM pending_queue WHERE status = 'pending' ORDER BY queue_num ASC", fetchall=True) or []
 
 def mark_pending_fulfilled(pending_id):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE pending_queue SET status = 'fulfilled' WHERE id = ?", (pending_id,))
-    conn.commit()
-    conn.close()
+    execute_query("UPDATE pending_queue SET status = 'fulfilled' WHERE id = ?", (pending_id,), commit=True)
 
 def clear_pending_queue():
-    execute_query("DELETE FROM pending_queue WHERE status = 'pending'")
+    execute_query("DELETE FROM pending_queue WHERE status = 'pending'", commit=True)
 
 # ----------------- TELETHON SOURCE CHANNELS HELPERS -----------------
 

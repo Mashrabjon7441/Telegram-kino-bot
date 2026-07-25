@@ -505,6 +505,38 @@ def callback_handler(call):
         msg = bot.send_message(call.message.chat.id, "➕ **Yangi manba kanali username-ni kiriting (Masalan: `@kinolar_tv`):**\n\nBekor qilish uchun 'bekor' deb yozing.", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_add_source_channel_step)
 
+    elif call.data == "auto_index_all_pending":
+        pending_list = database.get_all_pending_videos()
+        if not pending_list:
+            bot.answer_callback_query(call.id, "Kutilayotgan kinolar yo'q!", show_alert=True)
+            return
+
+        bot.answer_callback_query(call.id, f"{len(pending_list)} ta kino avto-kodlanmoqda...", show_alert=False)
+
+        count = 0
+        for pending_id, queue_num, file_id, def_title, def_caption in pending_list:
+            raw_title = def_title.strip() if def_title else f"Kino #{queue_num}"
+            code = generate_unique_code()
+            database.add_movie(code, raw_title, def_caption or "", "Umumiy", 0, "🇺🇿 O'zbekcha")
+            database.add_episode(code, "To'liq film", file_id)
+            database.mark_pending_fulfilled(pending_id)
+            count += 1
+
+        bot.send_message(
+            call.message.chat.id,
+            f"🎉 **{count} TA KUTILAYOTGAN KINO AVTOMATIK KODLANDI VA SAQLANDI!** 🚀\n\n"
+            f"Barcha navbatdagi kinolarga 4-xonali unikal kodlar biriktirildi hamda Cloud PostgreSQL bazasiga umrbodga saqlandi!",
+            parse_mode="Markdown"
+        )
+
+    elif call.data == "clear_batch_queue":
+        database.clear_pending_queue()
+        bot.answer_callback_query(call.id, "Navbat tozalandi!", show_alert=True)
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
+
     elif call.data == "manage_src_channels":
         bot.answer_callback_query(call.id)
         channels = database.get_telethon_source_channels()
@@ -1480,7 +1512,7 @@ def text_handler(message):
         bot.send_message(message.chat.id, msg_text, reply_markup=markup, parse_mode="Markdown")
         return
 
-    elif (text == "📥 Kutilayotgan Kinolar" or text == "📥 Kutilayotgan Kinolar (Queue)") and is_admin(user_id):
+    elif text == "📥 Kutilayotgan Kinolar" and is_admin(user_id):
         pending_count = database.get_pending_queue_count()
         if pending_count == 0:
             bot.send_message(message.chat.id, "📥 **Hozirda kutilayotgan nomsiz kinolar yo'q.**", parse_mode="Markdown", reply_markup=get_admin_keyboard(user_id))
@@ -1488,14 +1520,15 @@ def text_handler(message):
 
         markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(
-            types.InlineKeyboardButton(text=f"▶️ Nomlashni Boshlash / Davom Ettirish ({pending_count} ta)", callback_data="start_batch_naming"),
+            types.InlineKeyboardButton(text=f"⚡ Barchasiga Avto-Kod Berib Saqlash ({pending_count} ta)", callback_data="auto_index_all_pending"),
+            types.InlineKeyboardButton(text=f"✍️ Ketma-ket nomlash / Davom ettirish ({pending_count} ta)", callback_data="start_batch_naming"),
             types.InlineKeyboardButton(text="❌ Navbatni Tozalash", callback_data="clear_batch_queue")
         )
         bot.send_message(
             message.chat.id,
             f"📥 **KUTILAYOTGAN KINOLAR NAVBATI:**\n\n"
-            f"Hozirda **{pending_count} ta** nomsiz kino navbatda turibdi (Kino #1, Kino #2...).\n\n"
-            f"Ketma-ket nomlab saqlash uchun pastdagi tugmani bosing:",
+            f"Hozirda **{pending_count} ta** kino navbatda turibdi.\n\n"
+            f"⚡ **Barchasiga 4 xonali unikal kod berib lahzada saqlash** yoki ketma-ket nomlash uchun pastdagi tugmani bosing:",
             reply_markup=markup,
             parse_mode="Markdown"
         )
