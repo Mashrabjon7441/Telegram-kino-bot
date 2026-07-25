@@ -799,51 +799,45 @@ def get_users_count():
     return count
 
 def add_movie(code, title, caption, genre='Umumiy', is_vip=0, language="🇺🇿 O'zbekcha"):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    try:
-        cursor.execute("""
+    if DATABASE_URL:
+        sql = """
+            INSERT INTO movies (code, title, caption, genre, views, is_vip, language)
+            VALUES (%s, %s, %s, %s, COALESCE((SELECT views FROM movies WHERE code = %s), 0), %s, %s)
+            ON CONFLICT (code) DO UPDATE SET
+                title = EXCLUDED.title,
+                caption = EXCLUDED.caption,
+                genre = EXCLUDED.genre,
+                is_vip = EXCLUDED.is_vip,
+                language = EXCLUDED.language
+        """
+        params = (code.strip(), title.strip(), caption.strip() if caption else "", genre.strip(), code.strip(), is_vip, language.strip())
+    else:
+        sql = """
             INSERT OR REPLACE INTO movies (code, title, caption, genre, views, is_vip, language)
             VALUES (?, ?, ?, ?, COALESCE((SELECT views FROM movies WHERE code = ?), 0), ?, ?)
-        """, (code.strip(), title.strip(), caption.strip() if caption else "", genre.strip(), code.strip(), is_vip, language.strip()))
-        conn.commit()
-        success = True
-    except Exception as e:
-        print(f"Error saving movie: {e}")
-        success = False
-    finally:
-        conn.close()
-    return success
+        """
+        params = (code.strip(), title.strip(), caption.strip() if caption else "", genre.strip(), code.strip(), is_vip, language.strip())
+    
+    return execute_query(sql, params, commit=True) is not None
 
 def get_movie(code):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT code, title, caption, genre, views, is_vip, language FROM movies WHERE code = ?", (code.strip(),))
-    res = cursor.fetchone()
-    conn.close()
-    return res
+    return execute_query(
+        "SELECT code, title, caption, genre, views, is_vip, language FROM movies WHERE code = ?",
+        (code.strip(),),
+        fetchone=True
+    )
 
 def toggle_movie_vip(code):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT is_vip FROM movies WHERE code = ?", (code.strip(),))
-    res = cursor.fetchone()
+    res = execute_query("SELECT is_vip FROM movies WHERE code = ?", (code.strip(),), fetchone=True)
     if not res:
-        conn.close()
         return False, False
     current_vip = res[0] or 0
     new_vip = 0 if current_vip == 1 else 1
-    cursor.execute("UPDATE movies SET is_vip = ? WHERE code = ?", (new_vip, code.strip()))
-    conn.commit()
-    conn.close()
+    execute_query("UPDATE movies SET is_vip = ? WHERE code = ?", (new_vip, code.strip()), commit=True)
     return True, bool(new_vip)
 
 def movie_exists_by_exact_title(title):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT 1 FROM movies WHERE title = ?", (title.strip(),))
-    res = cursor.fetchone()
-    conn.close()
+    res = execute_query("SELECT 1 FROM movies WHERE title = ?", (title.strip(),), fetchone=True)
     return res is not None
 
 def find_movie_by_base_title(base_title):
@@ -873,108 +867,72 @@ def find_movie_by_base_title(base_title):
     return None
 
 def search_movies_by_name(query):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
     search = f"%{query.strip()}%"
-    cursor.execute("SELECT code, title, genre, views, is_vip, language FROM movies WHERE title LIKE ? OR caption LIKE ? LIMIT 20", (search, search))
-    res = cursor.fetchall()
-    conn.close()
-    return res
-
+    return execute_query(
+        "SELECT code, title, genre, views, is_vip, language FROM movies WHERE title LIKE ? OR caption LIKE ? LIMIT 30",
+        (search, search),
+        fetchall=True
+    ) or []
 
 def get_movies_by_genre(genre):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT code, title, views, is_vip, language FROM movies WHERE genre = ? ORDER BY id DESC LIMIT 30", (genre.strip(),))
-    res = cursor.fetchall()
-    conn.close()
-    return res
+    return execute_query(
+        "SELECT code, title, views, is_vip, language FROM movies WHERE genre = ? ORDER BY id DESC LIMIT 30",
+        (genre.strip(),),
+        fetchall=True
+    ) or []
 
 def get_movies_by_language(language):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT code, title, genre, views, is_vip FROM movies WHERE language LIKE ? ORDER BY id DESC LIMIT 30", (f"%{language.strip()}%",))
-    res = cursor.fetchall()
-    conn.close()
-    return res
+    return execute_query(
+        "SELECT code, title, genre, views, is_vip FROM movies WHERE language LIKE ? ORDER BY id DESC LIMIT 30",
+        (f"%{language.strip()}%",),
+        fetchall=True
+    ) or []
 
 def get_top_movies(limit=10):
-
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT code, title, views, genre, is_vip FROM movies ORDER BY views DESC LIMIT ?", (limit,))
-    res = cursor.fetchall()
-    conn.close()
-    return res
+    return execute_query(
+        "SELECT code, title, views, genre, is_vip FROM movies ORDER BY views DESC LIMIT ?",
+        (limit,),
+        fetchall=True
+    ) or []
 
 def increment_movie_views(code):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE movies SET views = views + 1 WHERE code = ?", (code.strip(),))
-    conn.commit()
-    conn.close()
+    execute_query("UPDATE movies SET views = views + 1 WHERE code = ?", (code.strip(),), commit=True)
 
 def add_episode(movie_code, episode_title, file_id):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    try:
-        cursor.execute("""
-            INSERT INTO episodes (movie_code, episode_title, file_id)
-            VALUES (?, ?, ?)
-        """, (movie_code.strip(), episode_title.strip(), file_id.strip()))
-        conn.commit()
-        success = True
-    except Exception as e:
-        print(f"Error saving episode: {e}")
-        success = False
-    finally:
-        conn.close()
-    return success
+    return execute_query(
+        "INSERT INTO episodes (movie_code, episode_title, file_id) VALUES (?, ?, ?)",
+        (movie_code.strip(), episode_title.strip(), file_id.strip()),
+        commit=True
+    ) is not None
 
 def get_episodes(movie_code):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, episode_title, file_id FROM episodes WHERE movie_code = ?", (movie_code.strip(),))
-    res = cursor.fetchall()
-    conn.close()
-    return res
+    return execute_query(
+        "SELECT id, episode_title, file_id FROM episodes WHERE movie_code = ?",
+        (movie_code.strip(),),
+        fetchall=True
+    ) or []
 
 def get_episode_by_id(episode_id):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT file_id, episode_title, movie_code FROM episodes WHERE id = ?", (episode_id,))
-    res = cursor.fetchone()
-    conn.close()
-    return res
+    return execute_query(
+        "SELECT file_id, episode_title, movie_code FROM episodes WHERE id = ?",
+        (episode_id,),
+        fetchone=True
+    )
 
 def delete_movie(code):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM episodes WHERE movie_code = ?", (code.strip(),))
-    cursor.execute("DELETE FROM movies WHERE code = ?", (code.strip(),))
-    cursor.execute("DELETE FROM ratings WHERE movie_code = ?", (code.strip(),))
-    cursor.execute("DELETE FROM favorites WHERE movie_code = ?", (code.strip(),))
-    conn.commit()
-    deleted = cursor.rowcount > 0
-    conn.close()
-    return deleted
+    c = code.strip()
+    execute_query("DELETE FROM episodes WHERE movie_code = ?", (c,), commit=True)
+    execute_query("DELETE FROM ratings WHERE movie_code = ?", (c,), commit=True)
+    execute_query("DELETE FROM favorites WHERE movie_code = ?", (c,), commit=True)
+    res = execute_query("DELETE FROM movies WHERE code = ?", (c,), commit=True)
+    return res is not None
 
 def delete_episode(episode_id):
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM episodes WHERE id = ?", (episode_id,))
-    conn.commit()
-    deleted = cursor.rowcount > 0
-    conn.close()
-    return deleted
+    res = execute_query("DELETE FROM episodes WHERE id = ?", (episode_id,), commit=True)
+    return res is not None
 
 def get_all_movies():
-    conn = sqlite3.connect(DB_NAME, timeout=30.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT code, title, genre, views, is_vip FROM movies ORDER BY id DESC")
-    res = cursor.fetchall()
-    conn.close()
-    return res
+    return execute_query("SELECT code, title, genre, views, is_vip FROM movies ORDER BY id DESC", fetchall=True) or []
 
 # ----------------- PREMIUM USERS -----------------
 
