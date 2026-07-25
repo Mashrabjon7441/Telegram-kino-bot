@@ -844,13 +844,44 @@ def handle_private_video_or_doc(message):
                 ep_title = "To'liq film"
 
             database.add_episode(code, ep_title, file_id)
-            database.trigger_auto_backup(bot)
             print(f"✅ [Auto-Attach] Video file_id ({file_id[:15]}...) successfully linked to Movie Code {code} ({movie[1]}) as '{ep_title}'")
             try:
                 bot.send_message(message.chat.id, f"✅ Video `{code}` kodli kino ({movie[1]} - {ep_title}) bilan muvaffaqiyatli saqlandi!", parse_mode="Markdown")
             except Exception:
                 pass
             return
+
+    # Direct Video Upload without code in caption: Auto-create movie entry!
+    raw_title = caption.split('\n')[0][:60] if caption else "Yangi Video Kino"
+    clean_title = " ".join([w for w in raw_title.split() if not w.startswith('#')]) or "Yangi Kino"
+
+    # Check if movie title already exists
+    existing_movie = database.find_movie_by_base_title(clean_title)
+    if existing_movie:
+        code = existing_movie[0]
+        episodes = database.get_episodes(code)
+        ep_title = f"{len(episodes) + 1}-qism"
+        database.add_episode(code, ep_title, file_id)
+        try:
+            bot.send_message(message.chat.id, f"✅ Video mavjud `{code}` kodli kinoga (*{ep_title}*) biriktirildi!", parse_mode="Markdown")
+        except Exception:
+            pass
+    else:
+        code = generate_unique_code()
+        database.add_movie(code, clean_title, caption, "🌐 Boshqa", 0, "🇺🇿 O'zbekcha")
+        database.add_episode(code, "To'liq film", file_id)
+        print(f"✨ [Direct Upload Created] {clean_title} (Code: {code})")
+        try:
+            bot.send_message(
+                message.chat.id,
+                f"🎉 **YANGI KINO MUVAFFAQIYATLI BAZAGA SAQLANDI!** 🎬\n\n"
+                f"🎬 **Nomi:** {clean_title}\n"
+                f"🔑 **Biriktirilgan Unikal Kod:** `{code}`\n\n"
+                f"Foydalanuvchilar botga `{code}` kodini yuborib ushbu kinoni ko'rishlari mumkin! 🚀",
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
 
 
 
@@ -2549,16 +2580,16 @@ def telethon_movie_scraper_worker():
                                         duration = attr.duration
                                         break
 
-                            MIN_DURATION_SECONDS = 10 * 60  # 600 seconds = 10 minutes (allows serial episodes & movies)
+                            MIN_DURATION_SECONDS = 3 * 60  # 180 seconds = 3 minutes (allows cartoons, TV episodes & movies)
 
                             if duration is not None:
                                 if duration < MIN_DURATION_SECONDS:
-                                    print(f"⏩ [Filter Skipped] Short video/ad ({duration}s < 600s): {clean_title[:30]}")
+                                    print(f"⏩ [Filter Skipped] Short video/ad ({duration}s < 180s): {clean_title[:30]}")
                                     continue
                             else:
                                 file_size_mb = (getattr(msg.file, 'size', 0) or 0) / (1024 * 1024)
-                                if file_size_mb < 30:
-                                    print(f"⏩ [Filter Skipped] Small file ({file_size_mb:.1f}MB < 30MB): {clean_title[:30]}")
+                                if file_size_mb < 10:
+                                    print(f"⏩ [Filter Skipped] Small file ({file_size_mb:.1f}MB < 10MB): {clean_title[:30]}")
                                     continue
 
                             # Serial vs Movie Grouping Logic
