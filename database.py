@@ -182,6 +182,9 @@ def init_db():
                 status VARCHAR(20) DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_movies_code ON movies (code);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_channels_id ON channels (channel_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_settings_key ON settings (key);
         """)
         conn.commit()
         conn.close()
@@ -322,11 +325,35 @@ def get_users_count():
 
 def add_movie(code, title, caption, genre='Umumiy', is_vip=0, language="🇺🇿 O'zbekcha"):
     try:
-        execute_query("""
-            INSERT OR REPLACE INTO movies (code, title, caption, genre, views, is_vip, language)
-            VALUES (?, ?, ?, ?, COALESCE((SELECT views FROM movies WHERE code = ?), 0), ?, ?)
-        """, (code.strip(), title.strip(), caption.strip() if caption else "", genre.strip(), code.strip(), is_vip, language.strip()))
-        return True
+        code_str = code.strip()
+        title_str = title.strip()
+        caption_str = caption.strip() if caption else ""
+        genre_str = genre.strip()
+        lang_str = language.strip()
+
+        if IS_POSTGRES:
+            query = """
+                INSERT INTO movies (code, title, caption, genre, is_vip, language)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (code) DO UPDATE SET
+                title = EXCLUDED.title,
+                caption = EXCLUDED.caption,
+                genre = EXCLUDED.genre,
+                is_vip = EXCLUDED.is_vip,
+                language = EXCLUDED.language
+            """
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(query, (code_str, title_str, caption_str, genre_str, is_vip, lang_str))
+            conn.commit()
+            conn.close()
+            return True
+        else:
+            execute_query("""
+                INSERT OR REPLACE INTO movies (code, title, caption, genre, views, is_vip, language)
+                VALUES (?, ?, ?, ?, COALESCE((SELECT views FROM movies WHERE code = ?), 0), ?, ?)
+            """, (code_str, title_str, caption_str, genre_str, code_str, is_vip, lang_str))
+            return True
     except Exception as e:
         print(f"Error saving movie: {e}")
         return False
@@ -369,8 +396,20 @@ def increment_movie_views(code):
 
 def add_episode(movie_code, episode_title, file_id):
     try:
-        execute_query("INSERT INTO episodes (movie_code, episode_title, file_id) VALUES (?, ?, ?)", (movie_code.strip(), episode_title.strip(), file_id.strip()))
-        return True
+        code_str = movie_code.strip()
+        title_str = episode_title.strip()
+        file_str = file_id.strip()
+
+        if IS_POSTGRES:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("INSERT INTO episodes (movie_code, episode_title, file_id) VALUES (%s, %s, %s)", (code_str, title_str, file_str))
+            conn.commit()
+            conn.close()
+            return True
+        else:
+            execute_query("INSERT INTO episodes (movie_code, episode_title, file_id) VALUES (?, ?, ?)", (code_str, title_str, file_str))
+            return True
     except Exception as e:
         print(f"Error saving episode: {e}")
         return False
