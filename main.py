@@ -2240,9 +2240,10 @@ def force_initial_movie_population():
             print(f"✅ Initial batch force-added: {title} (Code: {code})")
 
 def telethon_movie_scraper_worker():
-    """Telethon Userbot client that searches public Telegram channels using connected user account and imports real video files"""
+    """Telethon Userbot client that searches user account chat, Saved Messages ('me'), and public Telegram channels to import all video files"""
     import asyncio
     import time
+    import re
     from telethon import TelegramClient, events
 
     api_id_str = database.get_setting('telethon_api_id')
@@ -2257,7 +2258,6 @@ def telethon_movie_scraper_worker():
         api_id = int(api_id_str)
         print(f"🚀 Telethon Userbot starting with API ID: {api_id}...")
 
-        # Initialize Telethon Client session
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         client = TelegramClient('telethon_userbot_session', api_id, api_hash, loop=loop)
@@ -2268,7 +2268,7 @@ def telethon_movie_scraper_worker():
                 print("⚠️ Telethon user not authorized yet. Awaiting initial login string.")
                 return
 
-            print("✅ Telethon Userbot CONNECTED and searching public Telegram channels for MP4 videos...")
+            print("✅ Telethon Userbot CONNECTED! Scanning Saved Messages ('me'), user account chats & channels for MP4 videos...")
 
             try:
                 bot_info = bot.get_me()
@@ -2276,26 +2276,48 @@ def telethon_movie_scraper_worker():
             except Exception:
                 bot_username = "me"
 
-            # Unlimited historic search (Iterate ALL messages in specified channels!)
-            import re
-            custom_target_channel = database.get_setting('telethon_target_channel')
-            public_movie_channels = [
-                'kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd', 'top_kinolar'
-            ]
-            if custom_target_channel:
-                clean_target = custom_target_channel.replace('@', '').strip()
-                if clean_target and clean_target not in public_movie_channels:
-                    public_movie_channels.insert(0, clean_target)
-
             while True:
                 if database.get_setting('telethon_scraper_paused') == '1':
                     await asyncio.sleep(15)
                     continue
 
-                for ch in public_movie_channels:
+                # Build comprehensive target list: Saved Messages ('me') + account dialogs + custom channel + public channels
+                targets = ['me']
+
+                custom_target_channel = database.get_setting('telethon_target_channel')
+                if custom_target_channel:
+                    clean_target = custom_target_channel.replace('@', '').strip()
+                    if clean_target and clean_target not in targets:
+                        targets.append(clean_target)
+
+                # Auto-fetch active dialogs from user account history
+                try:
+                    dialogs = await client.get_dialogs(limit=50)
+                    for d in dialogs:
+                        if d.is_channel or d.is_group or d.is_user:
+                            if d.entity and getattr(d.entity, 'username', None):
+                                u = d.entity.username
+                                if u and u not in targets and u != bot_username:
+                                    targets.append(u)
+                            elif d.id not in targets:
+                                targets.append(d.id)
+                except Exception as ex_d:
+                    print(f"Dialog fetch info: {ex_d}")
+
+                public_movie_channels = ['kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd', 'top_kinolar']
+                for p_ch in public_movie_channels:
+                    if p_ch not in targets:
+                        targets.append(p_ch)
+
+                for ch in targets:
+                    if database.get_setting('telethon_scraper_paused') == '1':
+                        break
                     try:
-                        # limit=None fetches ALL messages in channel history without any cap!
+                        print(f"🔍 [Telethon Userbot] Scanning target chat/channel: {ch}...")
                         async for msg in client.iter_messages(ch, limit=None):
+                            if database.get_setting('telethon_scraper_paused') == '1':
+                                break
+
                             if msg.video or msg.document:
                                 cap = msg.message or "Manba kino"
                                 raw_title = cap.split('\n')[0][:60] if cap else "Telegram Movie"
@@ -2305,7 +2327,6 @@ def telethon_movie_scraper_worker():
 
                                 cap_lower = cap.lower()
 
-                                # Advanced Serial Detection Regex (1-qism, 2 qism, 1-серия, e01, s01e02, part 1, 1-qism...)
                                 serial_patterns = [
                                     r'\d+\s*-\s*qism', r'\d+\s*qism', r'qism\s*\d+',
                                     r'\d+\s*-\s*серия', r'\d+\s*серия', r'серия\s*\d+',
@@ -2320,16 +2341,18 @@ def telethon_movie_scraper_worker():
                                     code = generate_unique_code()
                                     database.add_movie(code, full_title, cap, "🌐 Boshqa", 0, "🇺🇿 O'zbekcha")
                                     
-                                    # Send video file through bot
-                                    await client.send_file(bot_username, msg.media, caption=f"/start {code}")
+                                    try:
+                                        await client.send_file(bot_username, msg.media, caption=f"/start {code}")
+                                    except Exception as e_send:
+                                        print(f"Userbot send_file exception: {e_send}")
+
                                     database.trigger_auto_backup(bot)
-                                    print(f"🚀 Telethon Userbot AUTO-COPIED UNLIMITED VIDEO: {full_title} (Code: {code})")
+                                    print(f"🚀 Telethon Userbot AUTO-COPIED VIDEO: {full_title} (Code: {code})")
                                     await asyncio.sleep(2)
                     except Exception as ex:
-                        print(f"Error scraping channel {ch}: {ex}")
-                
-                await asyncio.sleep(300)
+                        print(f"Error scraping chat {ch}: {ex}")
 
+                await asyncio.sleep(180)
 
         loop.run_until_complete(run_telethon_bot())
     except Exception as e:
