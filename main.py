@@ -19,6 +19,17 @@ import random
 # Initialize database
 database.init_db()
 
+# Hard purge all movies to 0 if not purged yet
+try:
+    if database.get_setting('database_purged_zero') != '1':
+        database.execute_query("DELETE FROM episodes", commit=True)
+        database.execute_query("DELETE FROM movies", commit=True)
+        database.execute_query("DELETE FROM pending_queue", commit=True)
+        database.set_setting('database_purged_zero', '1')
+        print("🧹 HARD PURGED ALL MOVIES DOWN TO 0 ON STARTUP!")
+except Exception as e:
+    print(f"Purge error: {e}")
+
 # Initialize bot with high-concurrency 30-worker thread pool
 bot = telebot.TeleBot(config.BOT_TOKEN, threaded=True, num_threads=30)
 
