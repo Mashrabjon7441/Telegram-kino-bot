@@ -18,17 +18,7 @@ import random
 
 # Initialize database
 database.init_db()
-
-# Hard purge all movies to 0 if not purged yet
-try:
-    if database.get_setting('database_purged_zero') != '1':
-        database.execute_query("DELETE FROM episodes", commit=True)
-        database.execute_query("DELETE FROM movies", commit=True)
-        database.execute_query("DELETE FROM pending_queue", commit=True)
-        database.set_setting('database_purged_zero', '1')
-        print("🧹 HARD PURGED ALL MOVIES DOWN TO 0 ON STARTUP!")
-except Exception as e:
-    print(f"Purge error: {e}")
+print(f"✅ Database initialized. Active movies: {len(database.get_all_movies())}")
 
 # Initialize bot with high-concurrency 30-worker thread pool
 bot = telebot.TeleBot(config.BOT_TOKEN, threaded=True, num_threads=30)
@@ -736,6 +726,11 @@ def callback_handler(call):
         bot.answer_callback_query(call.id)
         send_movie_card(call.message.chat.id, code, user_id)
 
+    elif call.data.startswith("admin_preview:"):
+        code = call.data.split(":")[1]
+        bot.answer_callback_query(call.id)
+        send_movie_card(call.message.chat.id, code, user_id)
+
     elif call.data == "admin_new_movie":
         bot.answer_callback_query(call.id)
         msg = bot.send_message(call.message.chat.id, "Yangi kino nomini (sarlavhasini) kiriting (Bekor qilish uchun 'bekor' deb yozing):")
@@ -1191,14 +1186,17 @@ def handle_private_video_or_doc(message):
         database.add_episode(m_code, episode_title, file_id)
         send_video_to_archive_channel(bot, file_id, m_title, m_code, episode_title)
 
+        confirm_markup = types.InlineKeyboardMarkup()
+        confirm_markup.add(types.InlineKeyboardButton(text=f"🎬 Kinoni Ko'rish (Kodi: {m_code})", callback_data=f"admin_preview:{m_code}"))
         bot.send_message(
             message.chat.id,
-            f"🎉 **[MASTER-RO'YXAT BO'YICHA AVTO-MATCHING SAQLANDI!]** 🚀\n\n"
-            f"🎬 **Kino Nomi:** {m_title}\n"
-            f"🔑 **Unikal Kodi:** `{m_code}`\n"
+            f"🎉 **AVTO-MATCHING: SAQLANDI!** 🚀\n\n"
+            f"🎬 **Kino:** {m_title}\n"
+            f"🔑 **Kodi:** `{m_code}`\n"
             f"🎭 **Janr:** {m_genre}\n"
-            f"📌 **Qismi:** {episode_title}\n\n"
-            f"📌 Video fayli Cloud PostgreSQL bazasiga va Shaxsiy Video Baza kanaliga muvaffaqiyatli saqlandi!",
+            f"📌 **Qism:** {episode_title}\n\n"
+            f"📌 Bazaga va Video Baza kanaliga saqlandi!",
+            reply_markup=confirm_markup,
             parse_mode="Markdown"
         )
         return
@@ -1211,12 +1209,15 @@ def handle_private_video_or_doc(message):
         if movie:
             database.add_episode(target_code, "To'liq film", file_id)
             send_video_to_archive_channel(bot, file_id, movie[1], target_code, "To'liq film")
+            confirm_markup2 = types.InlineKeyboardMarkup()
+            confirm_markup2.add(types.InlineKeyboardButton(text=f"🎬 Kinoni Ko'rish (Kodi: {target_code})", callback_data=f"admin_preview:{target_code}"))
             bot.send_message(
                 message.chat.id,
-                f"✅ **[VIDEO BAZAGA BIRIKTIRILDI]**\n\n"
+                f"✅ **VIDEO BAZAGA BIRIKTIRILDI!**\n\n"
                 f"🎬 **Nomi:** {movie[1]}\n"
                 f"🔑 **Kino kodi:** `{target_code}`\n\n"
-                f"📌 Video fayli Cloud PostgreSQL va Shaxsiy Video Baza kanaliga saqlandi!",
+                f"📌 Cloud PostgreSQL va Video Baza kanaliga saqlandi!",
+                reply_markup=confirm_markup2,
                 parse_mode="Markdown"
             )
             return
