@@ -131,12 +131,13 @@ def get_admin_keyboard(user_id):
 
     btn_auto_indexer = types.KeyboardButton("📥 Videolarni Forward Qilish (Avto-Baza)")
     btn_archive_ch = types.KeyboardButton("📦 Video Baza Kanalini Sozlash")
+    btn_clean_unnamed = types.KeyboardButton("🧹 Nomsiz Kinolarni Tozalash")
 
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
     keyboard.row(btn_auto_indexer)
     keyboard.row(btn_queue, btn_source_ch)
-    keyboard.row(btn_archive_ch)
+    keyboard.row(btn_archive_ch, btn_clean_unnamed)
     keyboard.row(btn_web_search)
     keyboard.row(btn_userbot)
     keyboard.row(btn_pause)
@@ -1627,6 +1628,17 @@ def text_handler(message):
         )
         msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_set_video_archive_channel)
+        return
+
+    elif text == "🧹 Nomsiz Kinolarni Tozalash" and is_admin(user_id):
+        database.delete_unnamed_movies()
+        bot.send_message(
+            message.chat.id,
+            "✅ **NOMSIZ VA NOSOZ KINOLAR BAZADAN TO'LIQ TOZALANDI!** 🧹\n\n"
+            "Bazadagi barcha nomi yo'q ('Yangi Kino Video', 'nomsiz', 'Untitled' va h.k.) kinolar hamda ularning biriktirilmagan qismlari muvaffaqiyatli o'chirib tashlandi!",
+            parse_mode="Markdown",
+            reply_markup=get_admin_keyboard(user_id)
+        )
         return
 
     elif text == "📥 Kutilayotgan Kinolar" and is_admin(user_id):

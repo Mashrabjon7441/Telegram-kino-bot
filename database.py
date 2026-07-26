@@ -947,6 +947,20 @@ def delete_episode(episode_id):
     res = execute_query("DELETE FROM episodes WHERE id = ?", (episode_id,), commit=True)
     return res is not None
 
+def delete_unnamed_movies():
+    """Deletes movies with placeholder or raw unnamed titles"""
+    query = """
+        DELETE FROM movies 
+        WHERE title LIKE '%Yangi Kino Video%' 
+           OR title LIKE '%nomsiz%' 
+           OR title LIKE '%Untitled%' 
+           OR title IS NULL 
+           OR title = ''
+    """
+    execute_query(query, commit=True)
+    execute_query("DELETE FROM episodes WHERE movie_code NOT IN (SELECT code FROM movies)", commit=True)
+    return True
+
 def get_all_movies():
     return execute_query("SELECT code, title, genre, views, is_vip FROM movies ORDER BY id ASC", fetchall=True) or []
 
