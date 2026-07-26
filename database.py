@@ -899,7 +899,24 @@ MASTER_MOVIE_DICTIONARY = [
     ("1030", "Mahallada Duv-Duv Gap", ["mahallada duv-duv gap", "махаллада дув-дув гап"], "Komediya", "🎬 **Mahallada Duv-Duv Gap**\n⭐ Reyting: 9.9/10\n📝 O'zbek kinosining eng buyuk oltin komediyasi."),
     ("1031", "Super Kelinchak", ["super kelinchak", "супер келинчак"], "Komediya", "🎬 **Super Kelinchak**\n⭐ Reyting: 9.5/10\n📝 Zamonaviy kelin Diana va qaynona munosabatlari."),
     ("1032", "RRR", ["rrr", "ррр"], "Jangari", "🎬 **RRR**\n⭐ Reyting: 9.6/10\n📝 Hindiston ozodligi uchun ikki buyuk do'st jangi."),
-    ("1033", "KGF", ["kgf", "кгф"], "Jangari", "🎬 **KGF**\n⭐ Reyting: 9.5/10\n📝 Kolar oltin konlaridagi Rokki afsonasi.")
+    ("1033", "KGF", ["kgf", "кгф"], "Jangari", "🎬 **KGF**\n⭐ Reyting: 9.5/10\n📝 Kolar oltin konlaridagi Rokki afsonasi."),
+    ("1034", "Gladiator", ["gladiator", "гладиатор"], "Jangari", "🎬 **Gladiator**\n⭐ Reyting: 9.8/10\n📝 Maksimusning Rim imperiyasidagi qasos jangi."),
+    ("1035", "Venom", ["venom", "веном"], "Fantastika", "🎬 **Venom**\n⭐ Reyting: 9.2/10\n📝 Eddi Brok va o'zga sayyoralik simbiot Venom."),
+    ("1036", "Transformers", ["transformers", "трансформеры"], "Jangari", "🎬 **Transformers**\n⭐ Reyting: 9.3/10\n📝 Avtobotlar va Deseptikonlar koinot urushi."),
+    ("1037", "Yulduzlar Urushi", ["star wars", "звездные войны"], "Fantastika", "🎬 **Yulduzlar Urushi (Star Wars)**\n⭐ Reyting: 9.6/10\n📝 Jedaylar va Qorong'u kuchlar o'rtasidagi koinot doston."),
+    ("1038", "Oppenheimer", ["oppenheimer", "оппенгеймер"], "Drama", "🎬 **Oppenheimer**\n⭐ Reyting: 9.5/10\n📝 Atom bombasi otasi Robert Oppenxaymer fojiasi."),
+    ("1039", "Barbie", ["barbie", "барби"], "Komediya", "🎬 **Barbie**\n⭐ Reyting: 9.0/10\n📝 Barbilend va real dunyodagi rang-barang sarguzasht."),
+    ("1040", "Wednesday", ["wednesday", "уэнсдей"], "Fantastika", "🎬 **Wednesday**\n⭐ Reyting: 9.4/10\n📝 Uensdeyt Addamsning Nevermor akademiyasidagi sirlari."),
+    ("1041", "Kalmar O'yini", ["squid game", "игра в кальмара"], "Drama", "🎬 **Kalmar O'yini (Squid Game)**\n⭐ Reyting: 9.6/10\n📝 O'lim o'yini va katta pul mukofoti uchun ayovsiz jang."),
+    ("1042", "Qog'oz Bino (Money Heist)", ["money heist", "la casa de papel", "бумажный дом"], "Jangari", "🎬 **Qog'oz Bino (Money Heist)**\n⭐ Reyting: 9.7/10\n📝 Professor va uning guruhining Ispaniya zarbxonasidagi o'g'riligi."),
+    ("1043", "Sherlok Xolms", ["sherlock holmes", "шерлок холмс"], "Detektiv", "🎬 **Sherlok Xolms**\n⭐ Reyting: 9.5/10\n📝 Daho detektiv Sherlok va Doktor Vatson sirlari."),
+    ("1044", "Yura Davri Parki", ["jurassic park", "jurassic world", "парк юрского периода"], "Fantastika", "🎬 **Yura Davri Parki**\n⭐ Reyting: 9.3/10\n📝 Dinozavrlar tirilgan tirik park va tirik qolish jangi."),
+    ("1045", "Qora Kiyimdagilar", ["men in black", "люди в черном"], "Komediya", "🎬 **Qora Kiyimdagilar (Men in Black)**\n⭐ Reyting: 9.2/10\n📝 Agent J va Agent K ning o'zga sayyoraliklar bilan jangi."),
+    ("1046", "Qirol Sher", ["lion king", "король лев"], "Multfilm", "🎬 **Qirol Sher (The Lion King)**\n⭐ Reyting: 9.9/10\n📝 Kichik Simba va Prayd yerlarining afsonaviy qiroli."),
+    ("1047", "Madagaskar", ["madagascar", "мадагаскар"], "Multfilm", "🎬 **Madagaskar**\n⭐ Reyting: 9.3/10\n📝 Nyu-York hayvonot bog'i hayvonlarining Madagaskardagi poygalari."),
+    ("1048", "Minyonlar", ["minions", "despicable me", "гадкий я"], "Multfilm", "🎬 **Minyonlar (Despicable Me)**\n⭐ Reyting: 9.2/10\n📝 Gru va uning sariq kulgili minyonlari."),
+    ("1049", "Sumerki (Twilight)", ["twilight", "сумерки"], "Melodrama", "🎬 **Sumerki (Twilight)**\n⭐ Reyting: 9.1/10\n📝 Bella Svon va vampir Edvard Kallen afsonaviy sevgisi."),
+    ("1050", "Qashqirlar Makoni Pusu", ["kurtlar vadisi pusu"], "Jangari", "🎬 **Qashqirlar Makoni Pusu**\n⭐ Reyting: 9.8/10\n📝 Polat Alemdarning davlat va adolat yo'lidagi janglari.")
 ]
 
 def match_against_master_catalog(raw_title, caption_text):
