@@ -132,10 +132,12 @@ def get_admin_keyboard(user_id):
     btn_auto_indexer = types.KeyboardButton("📥 Videolarni Forward Qilish (Avto-Baza)")
     btn_archive_ch = types.KeyboardButton("📦 Video Baza Kanalini Sozlash")
     btn_clean_unnamed = types.KeyboardButton("🧹 Nomsiz Kinolarni Tozalash")
+    btn_master_list = types.KeyboardButton("📜 Master Kinolar Ro'yxati")
 
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
     keyboard.row(btn_auto_indexer)
+    keyboard.row(btn_master_list)
     keyboard.row(btn_queue, btn_source_ch)
     keyboard.row(btn_archive_ch, btn_clean_unnamed)
     keyboard.row(btn_web_search)
@@ -1177,6 +1179,30 @@ def handle_private_video_or_doc(message):
     if not raw_title:
         raw_title = "Yangi Kino Video"
 
+    # Check if video matches Master Movie Catalog Dictionary
+    master_match = database.match_against_master_catalog(raw_title, caption)
+    if master_match:
+        m_code, m_title, m_caption, m_genre = master_match
+        is_serial, _, episode_title = extract_serial_info(raw_title, caption)
+        
+        if not database.get_movie(m_code):
+            database.add_movie(m_code, m_title, m_caption, m_genre, 100, "🇺🇿 O'zbekcha")
+
+        database.add_episode(m_code, episode_title, file_id)
+        send_video_to_archive_channel(bot, file_id, m_title, m_code, episode_title)
+
+        bot.send_message(
+            message.chat.id,
+            f"🎉 **[MASTER-RO'YXAT BO'YICHA AVTO-MATCHING SAQLANDI!]** 🚀\n\n"
+            f"🎬 **Kino Nomi:** {m_title}\n"
+            f"🔑 **Unikal Kodi:** `{m_code}`\n"
+            f"🎭 **Janr:** {m_genre}\n"
+            f"📌 **Qismi:** {episode_title}\n\n"
+            f"📌 Video fayli Cloud PostgreSQL bazasiga va Shaxsiy Video Baza kanaliga muvaffaqiyatli saqlandi!",
+            parse_mode="Markdown"
+        )
+        return
+
     # Check if caption contains explicit 4-digit code (e.g. 1020)
     code_match = re.search(r'\b\d{4}\b', caption)
     if code_match:
@@ -1628,6 +1654,13 @@ def text_handler(message):
         )
         msg = bot.send_message(message.chat.id, msg_text, parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_set_video_archive_channel)
+        return
+
+    elif text == "📜 Master Kinolar Ro'yxati" and is_admin(user_id):
+        m_list = database.MASTER_MOVIE_DICTIONARY
+        lines = [f"• `{code}` — **{title}** ({genre})" for code, title, _, genre, _ in m_list]
+        m_text = f"📜 **AVTO-MATCHING MASTER KINOLAR RO'YXATI:**\n\n" + "\n".join(lines) + "\n\n💡 *2-akauntingizdan ushbu kinolar videolarini botga forward qilsangiz, bot avtomatik o'z kodi va nomi bilan saqlaydi!*"
+        bot.send_message(message.chat.id, m_text, parse_mode="Markdown")
         return
 
     elif text == "🧹 Nomsiz Kinolarni Tozalash" and is_admin(user_id):

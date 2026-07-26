@@ -866,6 +866,53 @@ def find_movie_by_base_title(base_title):
             
     return None
 
+MASTER_MOVIE_DICTIONARY = [
+    ("1001", "Temir Odam (Iron Man)", ["iron man", "temir odam", "железный человек"], "Jangari", "🎬 **Temir Odam (Iron Man)**\n⭐ Reyting: 9.0/10\n📝 Toni Stark va uning afsonaviy zirhli qahramonlik missiyasi."),
+    ("1002", "Kapitan Amerika (Captain America)", ["captain america", "kapitan amerika", "первый мститель", "qishki askar"], "Jangari", "🎬 **Kapitan Amerika (Captain America)**\n⭐ Reyting: 9.1/10\n📝 Stiv Rojersning 2-Jahon urushi va GIDRAga qarshi jangi."),
+    ("1003", "Tor (Thor)", ["thor", "tor", "тор", "ragnarok", "ragnaryok"], "Fantastika", "🎬 **Tor (Thor)**\n⭐ Reyting: 9.0/10\n📝 Asgard shahzodasi Torning afsonaviy momaqaldiroq va xudolar jangi."),
+    ("1004", "Qasoskorlar (The Avengers)", ["avengers", "qasoskorlar", "мстители", "infinity war", "endgame"], "Jangari", "🎬 **Qasoskorlar (The Avengers)**\n⭐ Reyting: 9.7/10\n📝 Tanos va koinot xavflariga qarshi buyuk qahramonlar birlashmasi."),
+    ("1005", "Forsaj (Fast & Furious)", ["fast", "furious", "forsaj", "форсаж", "tokyo drift"], "Jangari", "🎬 **Forsaj (Fast & Furious)**\n⭐ Reyting: 9.0/10\n📝 Dom Toretto va poygachilar oilasining tezkor ko'cha sarguzashtlari."),
+    ("1006", "Garri Potter (Harry Potter)", ["harry potter", "garri potter", "гарри поттер"], "Fantastika", "🎬 **Garri Potter (Harry Potter)**\n⭐ Reyting: 9.5/10\n📝 Xogvarts sehrgarlik maktabi va Lord Voldemortga qarshi buyuk jang."),
+    ("1007", "Uyda Yolg'iz (Home Alone)", ["home alone", "uyda yolg'iz", "uyda yolgiz", "один дома"], "Komediya", "🎬 **Uyda Yolg'iz (Home Alone)**\n⭐ Reyting: 9.6/10\n📝 Kichik Kevinning Yangi Yil bayramida o'g'rilarga qarshi kulgili jangi."),
+    ("1008", "Muzlik Davri (Ice Age)", ["ice age", "muzlik davri", "ледниковый период"], "Multfilm", "🎬 **Muzlik Davri (Ice Age)**\n⭐ Reyting: 9.0/10\n📝 Menni, Sid va Diyegoning muzlik davri kulgili sarguzashtlari."),
+    ("1009", "Shrek", ["shrek", "шрек"], "Komediya", "🎬 **Shrek**\n⭐ Reyting: 9.1/10\n📝 Yashil Shrek va Eshakning malika Fionani qutqarish komediyasi."),
+    ("1010", "Kung Fu Panda", ["kung fu panda", "кунг-фу панда"], "Multfilm", "🎬 **Kung Fu Panda**\n⭐ Reyting: 9.0/10\n📝 Semiz Panda Po va Ajdarho jangchisining jang san'ati sarguzashti."),
+    ("1011", "John Wick", ["john wick", "jon vik", "джон вик"], "Jangari", "🎬 **John Wick**\n⭐ Reyting: 9.3/10\n📝 Afsonaviy qotil Jon Vikning Oliy Stolga qarshi qasos janglari."),
+    ("1012", "Avatar", ["avatar", "аватар"], "Fantastika", "🎬 **Avatar**\n⭐ Reyting: 9.5/10\n📝 Jeyk Salli va Pandora sayyorasidagi ajoyib mo'jizalar."),
+    ("1013", "Taksi (Taxi)", ["taxi", "taksi", "такси"], "Komediya", "🎬 **Taksi (Taxi)**\n⭐ Reyting: 9.0/10\n📝 Marseldagi eng tez taxsichi Daniel va Emilien poygalari."),
+    ("1014", "Brat", ["brat", "брат"], "Jangari", "🎬 **Brat**\n⭐ Reyting: 9.6/10\n📝 Danila Bagrovning haqqoniylik va akalik burchi adolat jangi."),
+    ("1015", "Betmen (Batman)", ["batman", "betmen", "бэтмен", "dark knight"], "Jangari", "🎬 **Betmen (Batman)**\n⭐ Reyting: 9.9/10\n📝 Bryus Ueyn va Gotam shahridagi Joxer hamda Beynga qarshi jang."),
+    ("1016", "Dedpul (Deadpool)", ["deadpool", "dedpul", "дедпул"], "Komediya", "🎬 **Dedpul (Deadpool)**\n⭐ Reyting: 9.5/10\n📝 Ueyd Uilson va Volverin bilan hazilkash o'lmas janglar."),
+    ("1017", "Matritsa (The Matrix)", ["matrix", "matritsa", "матрица"], "Fantastika", "🎬 **Matritsa (The Matrix)**\n⭐ Reyting: 9.4/10\n📝 Neo va Agent Smit o'rtasidagi virtual va haqiqiy dunyo urushi."),
+    ("1018", "Terminator", ["terminator", "терминатор"], "Fantastika", "🎬 **Terminator**\n⭐ Reyting: 9.5/10\n📝 T-800 robotlari va Skaynet sun'iy intellekt urushi."),
+    ("1019", "Uzuklar Hukmdori", ["lord of the rings", "uzuklar hukmdori", "властелин колец"], "Sehrli", "🎬 **Uzuklar Hukmdori (Lord of the Rings)**\n⭐ Reyting: 9.9/10\n📝 Frodo va Mordordagi Yagona Uzukni yo'q qilish missiyasi."),
+    ("1020", "Xobbit (The Hobbit)", ["hobbit", "xobbit", "хоббит"], "Sehrli", "🎬 **Xobbit (The Hobbit)**\n⭐ Reyting: 9.3/10\n📝 Bilbo Beggins va Ajdarho Smaug xazinasi sarguzashtlari."),
+    ("1021", "Karib Qaroqchilari", ["pirates of the caribbean", "karib qaroqchilari", "пираты карибского моря"], "Sarguzasht", "🎬 **Karib Qaroqchilari**\n⭐ Reyting: 9.5/10\n📝 Kapitan Djek Chittak va dengiz qaroqchilarining sehrli sarguzashtlari."),
+    ("1022", "Qashqirlar Makoni", ["kurtlar vadisi", "qashqirlar makoni", "долина волков"], "Jangari", "🎬 **Qashqirlar Makoni**\n⭐ Reyting: 9.5/10\n📝 Polat Alemdarning Vatan va adolat yo'lidagi janglari."),
+    ("1023", "Interstellar", ["interstellar", "интерстеллар"], "Fantastika", "🎬 **Interstellar**\n⭐ Reyting: 9.2/10\n📝 Kosmik qora tuynuk va vaqt sayohati."),
+    ("1024", "Joker", ["joker", "джокер"], "Drama", "🎬 **Joker**\n⭐ Reyting: 9.6/10\n📝 Artur Flekning fojiali psixologik o'zgarishi."),
+    ("1025", "Titanik", ["titanic", "titanik", "титаник"], "Melodrama", "🎬 **Titanik**\n⭐ Reyting: 9.9/10\n📝 Jek va Rozaning unutilmas abadiy sevgisi."),
+    ("1026", "Inception", ["inception", "начало"], "Fantastika", "🎬 **Inception**\n⭐ Reyting: 9.7/10\n📝 Tushlar ichidagi tushga fikr joylash missiyasi."),
+    ("1027", "O'rgimchak Odam", ["spider-man", "spiderman", "o'rgimchak odam", "человек паук"], "Jangari", "🎬 **O'rgimchak Odam (Spider-Man)**\n⭐ Reyting: 9.3/10\n📝 Piter Parker va superqahramonlik jangi."),
+    ("1028", "Abdullajon", ["abdullajon", "абдулладжан"], "Komediya", "🎬 **Abdullajon**\n⭐ Reyting: 9.8/10\n📝 O'zbek qishlog'iga tushgan o'zga sayyoralik."),
+    ("1029", "Tangalik Bolalar", ["tangalik bolalar"], "Komediya", "🎬 **Tangalik Bolalar**\n⭐ Reyting: 9.7/10\n📝 Bolalikdagi samimiy va baxtiyor damlar."),
+    ("1030", "Mahallada Duv-Duv Gap", ["mahallada duv-duv gap", "махаллада дув-дув гап"], "Komediya", "🎬 **Mahallada Duv-Duv Gap**\n⭐ Reyting: 9.9/10\n📝 O'zbek kinosining eng buyuk oltin komediyasi."),
+    ("1031", "Super Kelinchak", ["super kelinchak", "супер келинчак"], "Komediya", "🎬 **Super Kelinchak**\n⭐ Reyting: 9.5/10\n📝 Zamonaviy kelin Diana va qaynona munosabatlari."),
+    ("1032", "RRR", ["rrr", "ррр"], "Jangari", "🎬 **RRR**\n⭐ Reyting: 9.6/10\n📝 Hindiston ozodligi uchun ikki buyuk do'st jangi."),
+    ("1033", "KGF", ["kgf", "кгф"], "Jangari", "🎬 **KGF**\n⭐ Reyting: 9.5/10\n📝 Kolar oltin konlaridagi Rokki afsonasi.")
+]
+
+def match_against_master_catalog(raw_title, caption_text):
+    """
+    Checks incoming forwarded video title/caption against Master Movie Catalog.
+    Returns: (matched_code, official_title, caption, genre) or None
+    """
+    text_lower = f"{raw_title} {caption_text}".lower()
+    for code, title, keywords, genre, caption in MASTER_MOVIE_DICTIONARY:
+        if any(kw in text_lower for kw in keywords):
+            return code, title, caption, genre
+    return None
+
 def search_movies_by_name(query):
     search = f"%{query.strip()}%"
     return execute_query(
