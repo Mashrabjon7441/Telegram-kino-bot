@@ -221,14 +221,20 @@ def send_movie_card(chat_id, code, user_id):
     code, title, caption, genre, views, is_vip = movie[:6]
     lang = movie[6] if len(movie) >= 7 and movie[6] else "🇺🇿 O'zbekcha"
 
+    # Sanitize markdown characters to prevent Telegram API Markdown parse errors (Error 400)
+    safe_title = (title or "").replace('*', '').replace('_', '').replace('`', '').replace('[', '(').replace(']', ')')
+    safe_caption = (caption or "").replace('*', '').replace('_', '').replace('`', '').replace('[', '(').replace(']', ')')
+    safe_genre = (genre or "").replace('*', '').replace('_', '').replace('`', '')
+    safe_lang = (lang or "").replace('*', '').replace('_', '').replace('`', '')
+
     # VIP Protection Check
     if is_vip and not database.is_premium_user(user_id) and not is_admin(user_id):
         ref_count = database.get_user_referral_count(user_id)
         rem_refs = 10 - (ref_count % 10) if (ref_count % 10) != 0 else 10
         vip_text = (
             f"🔒 **Ushbu kino faqat 👑 Premium foydalanuvchilar uchun!**\n\n"
-            f"🎬 **Kino:** {title}\n"
-            f"🌐 **Tili:** {lang}\n"
+            f"🎬 **Kino:** {safe_title}\n"
+            f"🌐 **Tili:** {safe_lang}\n"
             f"🔑 **Kodi:** `{code}`\n\n"
             f"💳 **Obuna Narxlari:**\n"
             f"• 1 oy — **10,000 so'm**\n"
@@ -240,7 +246,11 @@ def send_movie_card(chat_id, code, user_id):
         markup.add(types.InlineKeyboardButton(text="💳 Premium Sotib Olish", callback_data="buy_premium"))
         markup.add(types.InlineKeyboardButton(text="✍️ Adminga bog'lanish", callback_data="open_support"))
         markup.add(types.InlineKeyboardButton(text="👥 Do'stlarni taklif qilish", callback_data="open_ref"))
-        bot.send_message(chat_id, vip_text, reply_markup=markup, parse_mode="Markdown")
+        try:
+            bot.send_message(chat_id, vip_text, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            plain_vip = vip_text.replace('*', '').replace('`', '')
+            bot.send_message(chat_id, plain_vip, reply_markup=markup)
         return
 
     database.increment_movie_views(code)
@@ -254,18 +264,17 @@ def send_movie_card(chat_id, code, user_id):
     vip_badge = " 🔒 [VIP]" if is_vip else ""
 
     text = (
-        f"🎬 **Kino nomi:** {title}{vip_badge}\n"
-        f"🌐 **Tili:** {lang}\n"
-        f"🎭 **Janr:** {genre}\n"
+        f"🎬 **Kino nomi:** {safe_title}{vip_badge}\n"
+        f"🌐 **Tili:** {safe_lang}\n"
+        f"🎭 **Janr:** {safe_genre}\n"
         f"🔑 **Kodi:** `{code}`\n"
         f"👁 **Ko'rishlar:** {views + 1} ta\n"
         f"👍 **Yoqdi:** {likes} | 👎 **Yoqmadi:** {dislikes}\n"
     )
-    if caption:
-        text += f"\n📝 **Tavsif:** {caption}"
+    if safe_caption:
+        text += f"\n📝 **Tavsif:** {safe_caption}"
 
     text += "\n\nTomosha qilish uchun quyidagi tugmalarni bosing 👇"
-
 
     markup = types.InlineKeyboardMarkup(row_width=1)
     
@@ -276,9 +285,10 @@ def send_movie_card(chat_id, code, user_id):
         sorted_episodes = sorted(episodes, key=lambda x: (0 if x[2] and x[2] != 'demo_file_id' else 1, x[0]))
         for ep_id, ep_title, file_id in sorted_episodes:
             clean_title = (ep_title or "Qism").strip()
-            if clean_title not in seen_titles:
-                seen_titles.add(clean_title)
-                unique_episodes.append((ep_id, clean_title, file_id))
+            clean_btn_title = clean_title.replace('*', '').replace('_', '')
+            if clean_btn_title not in seen_titles:
+                seen_titles.add(clean_btn_title)
+                unique_episodes.append((ep_id, clean_btn_title, file_id))
 
         for ep_id, ep_title, _ in unique_episodes:
             markup.add(types.InlineKeyboardButton(text=f"🎬 {ep_title}", callback_data=f"play_ep:{ep_id}"))
@@ -295,7 +305,11 @@ def send_movie_card(chat_id, code, user_id):
     markup.add(types.InlineKeyboardButton(text=sub_text, callback_data=f"sub_toggle:{code}"))
     markup.add(types.InlineKeyboardButton(text="📢 Do'stlarga ulashish", switch_inline_query=f"{code}"))
 
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+    try:
+        bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+    except Exception:
+        plain_text = text.replace('*', '').replace('`', '').replace('🔒 [VIP]', '🔒 VIP')
+        bot.send_message(chat_id, plain_text, reply_markup=markup)
 
 def send_video_to_archive_channel(bot_instance, file_id, movie_title, movie_code, episode_title="To'liq film"):
     """
@@ -673,23 +687,31 @@ def _callback_handler_inner(call, user_id):
                 bot.answer_callback_query(call.id, "🔒 Ushbu qism faqat Premium a'zolar uchun!", show_alert=True)
                 return
 
-            bot.answer_callback_query(call.id, f"Yuklanmoqda: {episode_title}")
+            safe_m_title = (movie_title or "").replace('*', '').replace('_', '').replace('`', '').replace('[', '(').replace(']', ')')
+            safe_ep_title = (episode_title or "").replace('*', '').replace('_', '').replace('`', '').replace('[', '(').replace(']', ')')
+            bot.answer_callback_query(call.id, f"Yuklanmoqda: {safe_ep_title}")
             bot.send_chat_action(call.message.chat.id, 'upload_video')
 
-            caption_full = f"🎬 **Kino nomi:** {movie_title}\n📌 **Qism:** {episode_title}\n🔑 **Kodi:** {movie_code}"
+            caption_full = f"🎬 **Kino nomi:** {safe_m_title}\n📌 **Qism:** {safe_ep_title}\n🔑 **Kodi:** {movie_code}"
             
             # Content protection: Blocks forwarding, saving/downloading to phone gallery, and screen recording/screenshots!
             protect = not is_admin(user_id)
 
             if file_id == "demo_file_id" or not file_id:
                 bot.answer_callback_query(call.id, "⏳ Ushbu kino videosi hali yuklanmagan!", show_alert=True)
-                bot.send_message(
-                    call.message.chat.id,
-                    f"🎬 **{movie_title}** (*{episode_title}*)\n\n"
-                    f"⏳ **Ushbu kino videosi hali yuklanmagan!**\n"
-                    f"📌 Admin ushbu kinoning videosini jo'natishi bilan darhol bu yerda ko'rinadi.",
-                    parse_mode="Markdown"
-                )
+                try:
+                    bot.send_message(
+                        call.message.chat.id,
+                        f"🎬 **{safe_m_title}** (*{safe_ep_title}*)\n\n"
+                        f"⏳ **Ushbu kino videosi hali yuklanmagan!**\n"
+                        f"📌 Admin ushbu kinoning videosini jo'natishi bilan darhol bu yerda ko'rinadi.",
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    bot.send_message(
+                        call.message.chat.id,
+                        f"🎬 {safe_m_title} ({safe_ep_title})\n\n⏳ Ushbu kino videosi hali yuklanmagan!"
+                    )
                 return
 
             try:
@@ -698,12 +720,19 @@ def _callback_handler_inner(call, user_id):
                 try:
                     bot.send_document(call.message.chat.id, file_id, caption=caption_full, parse_mode="Markdown", protect_content=protect)
                 except Exception:
-                    bot.answer_callback_query(call.id, "⏳ Tez kunda joylanadi!", show_alert=True)
-                    bot.send_message(
-                        call.message.chat.id,
-                        f"🎬 **{movie_title}** (*{episode_title}*)\n\n⏳ **Tez kunda joylanadi!**",
-                        parse_mode="Markdown"
-                    )
+                    # Fallback plain caption without markdown parsing
+                    plain_caption = f"🎬 Kino nomi: {safe_m_title}\n📌 Qism: {safe_ep_title}\n🔑 Kodi: {movie_code}"
+                    try:
+                        bot.send_video(call.message.chat.id, file_id, caption=plain_caption, protect_content=protect)
+                    except Exception:
+                        try:
+                            bot.send_document(call.message.chat.id, file_id, caption=plain_caption, protect_content=protect)
+                        except Exception:
+                            bot.answer_callback_query(call.id, "⏳ Tez kunda joylanadi!", show_alert=True)
+                            bot.send_message(
+                                call.message.chat.id,
+                                f"🎬 {safe_m_title} ({safe_ep_title})\n\n⏳ Tez kunda joylanadi!"
+                            )
         else:
             bot.answer_callback_query(call.id, "❌ Ushbu qism topilmadi!", show_alert=True)
 
