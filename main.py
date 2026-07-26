@@ -1779,7 +1779,9 @@ def process_user_search_query(message):
     matches = database.search_movies_by_name(query_text)
     if matches:
         markup = types.InlineKeyboardMarkup(row_width=1)
-        for code, title, genre, views, is_vip in matches:
+        for row in matches:
+            code, title = row[0], row[1]
+            is_vip = row[4] if len(row) > 4 else 0
             safe_t = (title or "").replace('*', '').replace('_', '').replace('[', '(').replace(']', ')')
             vip_mark = " 🔒 [VIP]" if is_vip else ""
             markup.add(types.InlineKeyboardButton(text=f"🎬 {safe_t}{vip_mark} (🔑 {code})", callback_data=f"show_movie:{code}"))
