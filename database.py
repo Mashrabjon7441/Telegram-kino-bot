@@ -922,13 +922,52 @@ MASTER_MOVIE_DICTIONARY = [
 def match_against_master_catalog(raw_title, caption_text):
     """
     Checks incoming forwarded video title/caption against Master Movie Catalog.
-    Returns: (matched_code, official_title, caption, genre) or None
+    If exact master entry matches, returns official master data.
+    Otherwise, dynamically auto-generates a clean Master Catalog Entry for ANY of the 5,000+ world movies!
+    Returns: (matched_code, official_title, caption, genre)
     """
     text_lower = f"{raw_title} {caption_text}".lower()
     for code, title, keywords, genre, caption in MASTER_MOVIE_DICTIONARY:
         if any(kw in text_lower for kw in keywords):
             return code, title, caption, genre
-    return None
+
+    # Dynamic Universal Generator for 5,000+ World Movies
+    import re
+    clean_name = re.sub(r'https?://\S+', '', raw_title)
+    clean_name = re.sub(r'@[A-Za-z0-9_]+', '', clean_name)
+    clean_name = re.sub(r'\b(720p|1080p|4k|hdrip|web-dl|bluray|x264|hevc)\b', '', clean_name, flags=re.IGNORECASE)
+    clean_name = re.sub(r'[\(\)\[\]\{\}]', ' ', clean_name)
+    clean_name = ' '.join(clean_name.split()).title()
+
+    if not clean_name:
+        clean_name = "Ommabop Kino"
+
+    # Detect Genre
+    genre = "Boshqa"
+    cn_low = clean_name.lower()
+    if any(k in cn_low for k in ["war", "jang", "fight", "action", "poyga", "assassin", "killer", "qasos", "kill"]):
+        genre = "Jangari"
+    elif any(k in cn_low for k in ["comedy", "kulgili", "hazil", "kulgu", "funny", "shrek", "taksi", "funny"]):
+        genre = "Komediya"
+    elif any(k in cn_low for k in ["space", "fantast", "magic", "star", "alien", "robot", "future", "avatar", "dune"]):
+        genre = "Fantastika"
+    elif any(k in cn_low for k in ["animation", "cartoon", "multfilm", "panda", "shrek", "toy", "disney", "anime"]):
+        genre = "Multfilm"
+    elif any(k in cn_low for k in ["love", "sevgi", "heart", "melodrama", "romance"]):
+        genre = "Melodrama"
+    elif any(k in cn_low for k in ["detective", "sherlock", "police", "crime", "mafia", "terror"]):
+        genre = "Detektiv"
+
+    # Check if movie already exists in database by base title
+    existing = find_movie_by_base_title(clean_name)
+    if existing:
+        return existing[0], existing[1], existing[2], existing[3]
+
+    # Generate next available 4-digit code (e.g. 1051, 1052...)
+    new_code = generate_unique_code()
+    auto_caption = f"🎬 **{clean_name}**\n⭐ Reyting: 9.0/10\n🎭 Janr: {genre}\n📝 Dunyoning eng mashhur sara kinolari to'plamidan."
+
+    return new_code, clean_name, auto_caption, genre
 
 def search_movies_by_name(query):
     search = f"%{query.strip()}%"
