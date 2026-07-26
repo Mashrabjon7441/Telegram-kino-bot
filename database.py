@@ -1469,11 +1469,27 @@ def clear_pending_queue():
 
 def get_telethon_source_channels():
     val = get_setting('telethon_source_channels')
+    expanded_defaults = [
+        'kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd', 'top_kinolar',
+        'kino_olami', 'kino_baza', 'kino_premyeralar', 'tarjima_kinolar_hd', 'uzkino_baza',
+        'kino_bot_baza', 'seriallar_baza', 'kino_film_baza', 'marvel_dc_kinolar', 'hollywood_uz',
+        'kino_mashhur', 'kino_olami_hd', 'kino_vip_baza', 'boevik_kinolar', 'komediya_kinolar',
+        'multfilm_baza', 'dorama_uzbek', 'turk_seriallar_uz'
+    ]
     if not val:
-        default_list = ['kinolar_tv', 'kino_kodlari', 'uzbek_kinolar', 'tarjima_kinolar', 'films_hd', 'top_kinolar']
-        set_setting('telethon_source_channels', ",".join(default_list))
-        return default_list
-    return [ch.strip() for ch in val.split(',') if ch.strip()]
+        set_setting('telethon_source_channels', ",".join(expanded_defaults))
+        return expanded_defaults
+    
+    current = [ch.strip() for ch in val.split(',') if ch.strip()]
+    # Auto-merge new defaults for max coverage
+    updated = False
+    for default_ch in expanded_defaults:
+        if default_ch not in current:
+            current.append(default_ch)
+            updated = True
+    if updated:
+        set_setting('telethon_source_channels', ",".join(current))
+    return current
 
 def add_telethon_source_channel(channel_username):
     clean = channel_username.replace('@', '').strip()
