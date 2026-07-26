@@ -477,6 +477,23 @@ def start_cmd(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     user_id = call.from_user.id
+    try:
+        _callback_handler_inner(call, user_id)
+    except Exception as cb_err:
+        import traceback
+        err_msg = f"🚨 CALLBACK ERROR:\nData: {call.data}\nUser: {user_id}\nErr: {cb_err}\n{traceback.format_exc()[-800:]}"
+        print(err_msg)
+        try:
+            bot.answer_callback_query(call.id, "⚠️ Xatolik yuz berdi. Qayta urinib ko'ring.", show_alert=True)
+        except Exception:
+            pass
+        for adm in config.ADMIN_IDS:
+            try:
+                bot.send_message(adm, err_msg[:4000])
+            except Exception:
+                pass
+
+def _callback_handler_inner(call, user_id):
 
     if call.data == "check_sub":
         unsubscribed = get_unsubscribed_channels(user_id)
