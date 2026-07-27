@@ -47,8 +47,13 @@ def is_admin(user_id):
     return database.is_db_admin(user_id)
 
 def generate_unique_code():
-    while True:
+    for _ in range(2000):
         code = str(random.randint(1000, 9999))
+        if not database.get_movie(code):
+            return code
+    # Fallback to 5 or 6 digit codes if 4-digit range is exhausted
+    while True:
+        code = str(random.randint(10000, 999999))
         if not database.get_movie(code):
             return code
 
