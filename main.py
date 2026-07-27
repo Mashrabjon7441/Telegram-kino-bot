@@ -115,6 +115,7 @@ def get_admin_keyboard(user_id):
     btn_source_ch = types.KeyboardButton("📡 Manba Kanallari")
     btn_archive_ch = types.KeyboardButton("📦 Video Baza Kanali")
     btn_clean_unnamed = types.KeyboardButton("🧹 Nomsiz Tozalash")
+    btn_clean_novideo = types.KeyboardButton("🗑 Videosiz Tozalash")
     btn_web_search = types.KeyboardButton("🌐 Internet Qidiruv")
     btn_userbot = types.KeyboardButton("🚀 Userbot Avto-Kino")
     
@@ -130,7 +131,7 @@ def get_admin_keyboard(user_id):
     keyboard.row(btn_list, btn_stats)
     keyboard.row(btn_auto_indexer, btn_master_list)
     keyboard.row(btn_queue, btn_source_ch)
-    keyboard.row(btn_archive_ch, btn_clean_unnamed)
+    keyboard.row(btn_clean_unnamed, btn_clean_novideo)
     keyboard.row(btn_web_search, btn_userbot)
     keyboard.row(btn_pause, btn_channels)
     keyboard.row(btn_adv, btn_auto_post)
@@ -612,6 +613,35 @@ def _callback_handler_inner(call, user_id):
     elif call.data == "clear_batch_queue":
         database.clear_pending_queue()
         bot.answer_callback_query(call.id, "Navbat tozalandi!", show_alert=True)
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
+
+    elif call.data == "confirm_delete_novideo":
+        if not is_admin(user_id):
+            bot.answer_callback_query(call.id, "❌ Ruxsat yo'q!", show_alert=True)
+            return
+        bot.answer_callback_query(call.id, "⏳ O'chirilmoqda...")
+        deleted = database.delete_movies_without_video()
+        try:
+            bot.edit_message_text(
+                f"✅ **{deleted} ta videosiz kino o'chirildi!** 🗑\n\n"
+                f"Bazangiz endi faqat videoli kinolarni o'z ichiga oladi.",
+                call.message.chat.id,
+                call.message.message_id,
+                parse_mode="Markdown"
+            )
+        except Exception:
+            bot.send_message(
+                call.message.chat.id,
+                f"✅ **{deleted} ta videosiz kino o'chirildi!** 🗑",
+                parse_mode="Markdown",
+                reply_markup=get_admin_keyboard(user_id)
+            )
+
+    elif call.data == "cancel_delete_novideo":
+        bot.answer_callback_query(call.id, "Bekor qilindi.")
         try:
             bot.delete_message(call.message.chat.id, call.message.message_id)
         except Exception:
@@ -1721,6 +1751,36 @@ def text_handler(message):
             "Bazadagi barcha nomi yo'q ('Yangi Kino Video', 'nomsiz', 'Untitled' va h.k.) kinolar hamda ularning biriktirilmagan qismlari muvaffaqiyatli o'chirib tashlandi!",
             parse_mode="Markdown",
             reply_markup=get_admin_keyboard(user_id)
+        )
+        return
+
+    elif text == "🗑 Videosiz Tozalash" and is_admin(user_id):
+        # Preview first — show count before deleting
+        no_video_list = database.get_movies_without_video()
+        count = len(no_video_list)
+        if count == 0:
+            bot.send_message(
+                message.chat.id,
+                "✅ **Hammasi tartibda!** Videosiz kino topilmadi. 🎬",
+                parse_mode="Markdown",
+                reply_markup=get_admin_keyboard(user_id)
+            )
+            return
+        # Show preview and confirm button
+        preview = "\n".join([f"• `{code}` — {title or 'Nomsiz'}" for code, title in no_video_list[:15]])
+        if count > 15:
+            preview += f"\n...va yana {count - 15} ta"
+        markup = types.InlineKeyboardMarkup()
+        markup.add(
+            types.InlineKeyboardButton("✅ Ha, barchasini o'chir", callback_data="confirm_delete_novideo"),
+            types.InlineKeyboardButton("❌ Bekor qilish", callback_data="cancel_delete_novideo")
+        )
+        bot.send_message(
+            message.chat.id,
+            f"🗑 **VIDEOSIZ KINOLAR ({count} ta):**\n\n{preview}\n\n"
+            f"⚠️ Bu kinolarning hech birida video fayl yo'q.\nHammasini o'chirishni tasdiqlaysizmi?",
+            parse_mode="Markdown",
+            reply_markup=markup
         )
         return
 

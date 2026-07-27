@@ -541,6 +541,36 @@ def delete_episode(episode_id):
     res = execute_query("DELETE FROM episodes WHERE id = ?", (episode_id,))
     return res > 0
 
+def get_movies_without_video():
+    """Videosi yo'q kinolarni qaytaradi (episode file_id si yo'q yoki bo'sh)."""
+    return execute_query("""
+        SELECT m.code, m.title FROM movies m
+        WHERE NOT EXISTS (
+            SELECT 1 FROM episodes e
+            WHERE e.movie_code = m.code
+            AND e.file_id IS NOT NULL
+            AND e.file_id != ''
+        )
+        ORDER BY m.id DESC
+    """, fetchall=True)
+
+def delete_movies_without_video():
+    """Videosi yo'q barcha kinolarni o'chiradi. O'chirilgan kinolar sonini qaytaradi."""
+    # Find codes of movies with no valid video
+    movies = get_movies_without_video()
+    if not movies:
+        return 0
+    codes = [m[0] for m in movies]
+    deleted = 0
+    for code in codes:
+        execute_query("DELETE FROM episodes WHERE movie_code = ?", (code,))
+        execute_query("DELETE FROM ratings WHERE movie_code = ?", (code,))
+        execute_query("DELETE FROM favorites WHERE movie_code = ?", (code,))
+        res = execute_query("DELETE FROM movies WHERE code = ?", (code,))
+        if res > 0:
+            deleted += 1
+    return deleted
+
 def get_all_movies():
     return execute_query("SELECT code, title, genre, views, is_vip FROM movies ORDER BY id DESC", fetchall=True)
 
