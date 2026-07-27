@@ -1252,8 +1252,8 @@ def handle_private_video_or_doc(message):
         )
         return
 
-    # Check if caption contains explicit 4-digit code (e.g. 1020)
-    code_match = re.search(r'\b\d{4}\b', caption)
+    # Check if caption contains explicit 4 to 6-digit code (e.g. 1020 or 10024)
+    code_match = re.search(r'\b\d{4,6}\b', caption)
     if code_match:
         target_code = code_match.group(0)
         movie = database.get_movie(target_code)
