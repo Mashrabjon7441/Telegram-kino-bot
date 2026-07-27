@@ -1258,14 +1258,16 @@ def handle_private_video_or_doc(message):
         target_code = code_match.group(0)
         movie = database.get_movie(target_code)
         if movie:
-            database.add_episode(target_code, "To'liq film", file_id)
-            send_video_to_archive_channel(bot, file_id, movie[1], target_code, "To'liq film")
+            _, _, episode_title = extract_serial_info(raw_title, caption)
+            database.add_episode(target_code, episode_title, file_id)
+            send_video_to_archive_channel(bot, file_id, movie[1], target_code, episode_title)
             confirm_markup2 = types.InlineKeyboardMarkup()
             confirm_markup2.add(types.InlineKeyboardButton(text=f"🎬 Kinoni Ko'rish (Kodi: {target_code})", callback_data=f"admin_preview:{target_code}"))
             bot.send_message(
                 message.chat.id,
                 f"✅ **VIDEO BAZAGA BIRIKTIRILDI!**\n\n"
                 f"🎬 **Nomi:** {movie[1]}\n"
+                f"📌 **Qismi:** {episode_title}\n"
                 f"🔑 **Kino kodi:** `{target_code}`\n\n"
                 f"📌 Cloud PostgreSQL va Video Baza kanaliga saqlandi!",
                 reply_markup=confirm_markup2,
