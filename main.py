@@ -109,50 +109,46 @@ def get_admin_keyboard(user_id):
     btn_del = types.KeyboardButton("❌ Kino o'chirish")
     btn_list = types.KeyboardButton("📋 Barcha kinolar")
     btn_stats = types.KeyboardButton("📊 Statistika")
-    btn_channels = types.KeyboardButton("📢 Homiylar / Kanallar")
-    btn_source_ch = types.KeyboardButton("📡 Manba Kanalini Sozlash")
+    btn_auto_indexer = types.KeyboardButton("📥 Forward Baza")
+    btn_master_list = types.KeyboardButton("📜 Master Ro'yxat")
     btn_queue = types.KeyboardButton("📥 Kutilayotgan Kinolar")
-    btn_adv = types.KeyboardButton("✉️ Reklama yuborish")
-    btn_post_gen = types.KeyboardButton("📢 Post Generator")
-    btn_auto_post = types.KeyboardButton("📢 1-Click Kanalga Joylash")
-    btn_vip_mgmt = types.KeyboardButton("🔒 VIP Kinolarni Boshqarish")
-    btn_prem_mgmt = types.KeyboardButton("👑 Premium Boshqaruvi")
-    btn_web_search = types.KeyboardButton("🌐 Internetdan Qidiruv va Avto-Qo'shish")
-    btn_userbot = types.KeyboardButton("🚀 Telegram Akauntdan Avto-Kino Ko'chirish (Telethon)")
-    btn_back = types.KeyboardButton("⬅️ Bosh sahifa")
+    btn_source_ch = types.KeyboardButton("📡 Manba Kanallari")
+    btn_archive_ch = types.KeyboardButton("📦 Video Baza Kanali")
+    btn_clean_unnamed = types.KeyboardButton("🧹 Nomsiz Tozalash")
+    btn_web_search = types.KeyboardButton("🌐 Internet Qidiruv")
+    btn_userbot = types.KeyboardButton("🚀 Userbot Avto-Kino")
     
     is_paused = database.get_setting('telethon_scraper_paused') == '1'
-    btn_pause = types.KeyboardButton("▶️ Avto-Yuklashni Davom Ettirish") if is_paused else types.KeyboardButton("⏸️ Avto-Yuklashni Vaqtincha To'xtatish")
-
-    btn_auto_indexer = types.KeyboardButton("📥 Videolarni Forward Qilish (Avto-Baza)")
-    btn_archive_ch = types.KeyboardButton("📦 Video Baza Kanalini Sozlash")
-    btn_clean_unnamed = types.KeyboardButton("🧹 Nomsiz Kinolarni Tozalash")
-    btn_master_list = types.KeyboardButton("📜 Master Kinolar Ro'yxati")
+    btn_pause = types.KeyboardButton("▶️ Avto-Yuklashni Yoqish") if is_paused else types.KeyboardButton("⏸️ Avto-Yuklashni To'xtatish")
+    btn_channels = types.KeyboardButton("📢 Homiylar / Kanallar")
+    btn_adv = types.KeyboardButton("✉️ Reklama yuborish")
+    btn_auto_post = types.KeyboardButton("📢 1-Click Kanalga")
+    btn_vip_mgmt = types.KeyboardButton("🔒 VIP Kinolar")
+    btn_prem_mgmt = types.KeyboardButton("👑 Premium Boshqaruvi")
 
     keyboard.row(btn_add, btn_del)
     keyboard.row(btn_list, btn_stats)
-    keyboard.row(btn_auto_indexer)
-    keyboard.row(btn_master_list)
+    keyboard.row(btn_auto_indexer, btn_master_list)
     keyboard.row(btn_queue, btn_source_ch)
     keyboard.row(btn_archive_ch, btn_clean_unnamed)
-    keyboard.row(btn_web_search)
-    keyboard.row(btn_userbot)
-    keyboard.row(btn_pause)
-    keyboard.row(btn_channels, btn_adv)
-    keyboard.row(btn_post_gen, btn_auto_post)
+    keyboard.row(btn_web_search, btn_userbot)
+    keyboard.row(btn_pause, btn_channels)
+    keyboard.row(btn_adv, btn_auto_post)
     keyboard.row(btn_vip_mgmt, btn_prem_mgmt)
-
-
     
     if is_super_admin(user_id):
         btn_admin_list = types.KeyboardButton("👑 Adminlar Ro'yxati")
         btn_admin_del = types.KeyboardButton("➖ Admin o'chirish")
         btn_promo = types.KeyboardButton("🔑 Admin kodi yaratish")
+        btn_restart = types.KeyboardButton("🔄 Serverni Qayta Ishga Tushirish")
         keyboard.row(btn_admin_list, btn_admin_del)
-        keyboard.row(btn_promo)
-        
-    btn_restart = types.KeyboardButton("🔄 Serverni Qayta Ishga Tushirish")
-    keyboard.row(btn_restart, btn_back)
+        keyboard.row(btn_promo, btn_restart)
+    else:
+        btn_restart = types.KeyboardButton("🔄 Serverni Qayta Ishga Tushirish")
+        keyboard.row(btn_restart)
+
+    btn_back = types.KeyboardButton("⬅️ Bosh sahifa")
+    keyboard.row(btn_back)
     return keyboard
 
 
@@ -1496,7 +1492,7 @@ def text_handler(message):
         bot.send_message(message.chat.id, "Admin panelga xush kelibsiz. Amalni tanlang:", reply_markup=get_admin_keyboard(user_id))
         return
 
-    elif text == "📥 Videolarni Forward Qilish (Avto-Baza)" and is_admin(user_id):
+    elif (text == "📥 Videolarni Forward Qilish (Avto-Baza)" or text == "📥 Forward Baza") and is_admin(user_id):
         msg = (
             "📥 **AVTOMATIK CHAT/KANAL VIDEOLARINI BAZAGA ULASH:**\n\n"
             "👍 **Ikkinchi akaunt yoki Telethon SHART EMAS!**\n\n"
@@ -1549,7 +1545,7 @@ def text_handler(message):
         bot.send_message(message.chat.id, stat_text, parse_mode="Markdown")
         return
 
-    elif text == "🔒 VIP Kinolarni Boshqarish" and is_admin(user_id):
+    elif (text == "🔒 VIP Kinolarni Boshqarish" or text == "🔒 VIP Kinolar") and is_admin(user_id):
         markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(
             types.InlineKeyboardButton(text="➕ VIP ga qo'shish", callback_data="vip_add_prompt"),
@@ -1604,7 +1600,7 @@ def text_handler(message):
         bot.register_next_step_handler(msg, process_admin_premium_command)
         return
 
-    elif (text == "📢 1-Click Kanalga Joylash" or text == "📢 Post Generator") and is_admin(user_id):
+    elif (text == "📢 1-Click Kanalga Joylash" or text == "📢 Post Generator" or text == "📢 1-Click Kanalga") and is_admin(user_id):
         msg = bot.send_message(message.chat.id, "Kanalga post tayyorlash/joylash uchun kino kodini kiriting (Masalan: 1230):")
         bot.register_next_step_handler(msg, process_channel_post_generator)
         return
@@ -1613,7 +1609,7 @@ def text_handler(message):
         bot.send_message(message.chat.id, "Kanallarni boshqarish bo'limi:", reply_markup=get_channels_keyboard())
         return
 
-    elif (text == "🌐 Internetdan Qidiruv va Avto-Qo'shish" or text == "🌐 Internetdan Avto-Qidirish") and is_admin(user_id):
+    elif (text == "🌐 Internetdan Qidiruv va Avto-Qo'shish" or text == "🌐 Internetdan Avto-Qidirish" or text == "🌐 Internet Qidiruv") and is_admin(user_id):
         msg_text = (
             f"🌐 **INTERNETDAN KINOLARNI AVTO-QIDIRISH VA BAZAGA QO'SHISH:**\n\n"
             f"Siz internet ma'lumotlar bazasidan (TMDB/IMDb va Ochiq kinolar tarmoqlaridan) istalgan kino yoki serial nomini qidirishingiz mumkin:\n\n"
@@ -1624,7 +1620,7 @@ def text_handler(message):
         bot.register_next_step_handler(msg, process_web_movie_search)
         return
 
-    elif (text == "🚀 Telegram Akauntdan Avto-Kino Ko'chirish (Telethon)" or text == "🚀 Telethon Userbot") and is_admin(user_id):
+    elif (text == "🚀 Telegram Akauntdan Avto-Kino Ko'chirish (Telethon)" or text == "🚀 Telethon Userbot" or text == "🚀 Userbot Avto-Kino") and is_admin(user_id):
         userbot_session = database.get_setting('telethon_session_str')
         status = "✅ **FAOL & ULANGAN** 🟢" if userbot_session else "🔴 **SOZLANMAGAN**"
         
@@ -1632,7 +1628,7 @@ def text_handler(message):
             f"🚀 **IKKINCHI (MANBA) TELEGRAM AKAUNTINGIZNI ULASH:**\n\n"
             f"📌 **Status:** {status}\n\n"
             f"👍 **Juda to'g'ri qaror!** Shaxsiy admin profilizni berishingiz shart emas. Manba kanalida admin qilingan **ikkinchi ishchi Telegram akauntingizni (Worker Account)** ulashingiz mumkin!\n\n"
-            f"Ushbu akaunt Telegramdagi ochiq va yopiq kino kanallaridan kinolarni **haqiqiy video fayli va 4 xonali kodlari bilan** botingiz hamda kanalingizga avto-ko'chirib turadi!\n\n"
+            f"Ushbu akaunt Telegramdagi ochoq va yopiq kino kanallaridan kinolarni **haqiqiy video fayli va 4 xonali kodlari bilan** botingiz hamda kanalingizga avto-ko'chirib turadi!\n\n"
             f"⚙️ **Sozlash yo'riqnomasi:**\n"
             f"1. O'sha ikkinchi akauntingizdan [my.telegram.org](https://my.telegram.org) saytiga kirib `api_id` va `api_hash` olasiz.\n"
             f"2. Botga o'sha akauntning `API_ID API_HASH`ini yuborasiz (Masalan: `123456 abcdef1234567890`)\n\n"
@@ -1642,13 +1638,13 @@ def text_handler(message):
         bot.register_next_step_handler(msg, process_telethon_config)
         return
 
-    elif (text == "⏸️ Avto-Yuklashni Vaqtincha To'xtatish" or text == "⏸️ Avto-Yuklashni Pauza Qilish") and is_admin(user_id):
+    elif (text == "⏸️ Avto-Yuklashni Vaqtincha To'xtatish" or text == "⏸️ Avto-Yuklashni Pauza Qilish" or text == "⏸️ Avto-Yuklashni To'xtatish") and is_admin(user_id):
         database.set_setting('telethon_scraper_paused', '1')
         bot.send_message(
             message.chat.id,
             "⏸️ **AVTO-YUKLASH VAQTINCHA TO'XTATILDI!**\n\n"
             "Telethon roboti kanallardan yangi va eski kinolarni avtomatik ko'chirishni vaqtincha pauzaga qo'ydi.\n\n"
-            "*(Qayta yoqish uchun **`▶️ Avto-Yuklashni Davom Ettirish`** tugmasini bosing)*",
+            "*(Qayta yoqish uchun **`▶️ Avto-Yuklashni Yoqish`** tugmasini bosing)*",
             reply_markup=get_admin_keyboard(user_id),
             parse_mode="Markdown"
         )
@@ -1680,7 +1676,7 @@ def text_handler(message):
 
 
 
-    elif text == "📡 Manba Kanalini Sozlash" and is_admin(user_id):
+    elif (text == "📡 Manba Kanalini Sozlash" or text == "📡 Manba Kanallari") and is_admin(user_id):
         channels = database.get_telethon_source_channels()
         ch_list_str = "\n".join([f"• `@{c}`" for c in channels]) if channels else "Hozircha manba kanallar kiritilmagan"
 
@@ -1696,7 +1692,7 @@ def text_handler(message):
         bot.send_message(message.chat.id, msg_text, reply_markup=markup, parse_mode="Markdown")
         return
 
-    elif text == "📦 Video Baza Kanalini Sozlash" and is_admin(user_id):
+    elif (text == "📦 Video Baza Kanalini Sozlash" or text == "📦 Video Baza Kanali") and is_admin(user_id):
         current_arch = database.get_setting('video_archive_channel_id', 'Sozlanmagan')
         msg_text = (
             f"📦 **SHAXSIY VIDEO BAZA KANALI SOZLAMALARI:**\n\n"
@@ -1710,14 +1706,14 @@ def text_handler(message):
         bot.register_next_step_handler(msg, process_set_video_archive_channel)
         return
 
-    elif text == "📜 Master Kinolar Ro'yxati" and is_admin(user_id):
+    elif (text == "📜 Master Kinolar Ro'yxati" or text == "📜 Master Ro'yxat") and is_admin(user_id):
         m_list = database.MASTER_MOVIE_DICTIONARY
         lines = [f"• `{code}` — **{title}** ({genre})" for code, title, _, genre, _ in m_list]
         m_text = f"📜 **AVTO-MATCHING MASTER KINOLAR RO'YXATI:**\n\n" + "\n".join(lines) + "\n\n💡 *2-akauntingizdan ushbu kinolar videolarini botga forward qilsangiz, bot avtomatik o'z kodi va nomi bilan saqlaydi!*"
         bot.send_message(message.chat.id, m_text, parse_mode="Markdown")
         return
 
-    elif text == "🧹 Nomsiz Kinolarni Tozalash" and is_admin(user_id):
+    elif (text == "🧹 Nomsiz Kinolarni Tozalash" or text == "🧹 Nomsiz Tozalash") and is_admin(user_id):
         database.delete_unnamed_movies()
         bot.send_message(
             message.chat.id,
